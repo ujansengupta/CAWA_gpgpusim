@@ -232,6 +232,13 @@ public:
    std::list<class ptx_thread_info *> &active_threads() { return m_active_threads; }
    class memory_space *get_param_memory() { return m_param_mem; }
 
+   //***************** TW: 04/07/16 **************/
+   unsigned tw_next_cta_num() const
+   {
+     return m_next_cta.x + m_next_cta.y * m_grid_dim.x + m_next_cta.z * m_grid_dim.x * m_grid_dim.y;
+   }
+   //*********************************************/
+
 private:
    kernel_info_t( const kernel_info_t & ); // disable copy constructor
    void operator=( const kernel_info_t & ); // disable copy operator

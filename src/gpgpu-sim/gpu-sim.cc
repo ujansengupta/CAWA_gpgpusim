@@ -475,6 +475,10 @@ void gpgpu_sim::launch( kernel_info_t *kinfo )
        }
    }
    assert(n < m_running_kernels.size());
+   //********************* TW: 04/08/16 ******************/
+   printf("Kernel %d is launched\n", kinfo->get_uid());
+   m_shader_stats->tw_launch_kernel(kinfo->get_uid(), kinfo->num_blocks(), kinfo->threads_per_cta() / m_shader_config->warp_size);  // Initialize the critical_warp_info array
+   //*****************************************************/
 }
 
 bool gpgpu_sim::can_start_kernel()
@@ -918,6 +922,7 @@ void gpgpu_sim::gpu_print_stat()
    shader_print_scheduler_stat( stdout, false );
 
    m_shader_stats->print(stdout);
+
 #ifdef GPGPUSIM_POWER_MODEL
    if(m_config.g_power_simulation_enabled){
 	   m_gpgpusim_wrapper->print_power_kernel_stats(gpu_sim_cycle, gpu_tot_sim_cycle, gpu_tot_sim_insn + gpu_sim_insn, kernel_info_str, true );
@@ -1073,6 +1078,19 @@ void shader_core_ctx::issue_block2core( kernel_info_t &kernel )
       padded_cta_size = ((cta_size/m_config->warp_size)+1)*(m_config->warp_size);
     unsigned start_thread = free_cta_hw_id * padded_cta_size;
     unsigned end_thread  = start_thread +  cta_size;
+
+    //*********************** TW: 04/07/16 ************************/
+    tw_cta_num_in_kernel[free_cta_hw_id] = kernel.tw_next_cta_num();
+    printf("TW: Kernel %d core %d cta %d (block %d in kernel): \n", kernel.get_uid(), m_sid, free_cta_hw_id, kernel.tw_next_cta_num());
+    unsigned *rank_oracle_cpl = NULL;
+    tw_rank_oracle_cpl(free_cta_hw_id, &rank_oracle_cpl);
+    assert(rank_oracle_cpl != NULL);
+    assert(kernel.threads_per_cta() / m_config->warp_size == m_stats->tw_cpl_oracle[kernel.get_uid()-1][0][1]);
+    for (unsigned i = 0; i < kernel.threads_per_cta() / m_config->warp_size; i++){
+      printf("%d ", rank_oracle_cpl[i]);
+    }
+    printf("\n");
+    //*************************************************************/
 
     // reset the microarchitecture state of the selected hardware thread and warp contexts
     reinit(start_thread, end_thread,false);
@@ -1400,4 +1418,3 @@ simt_core_cluster * gpgpu_sim::getSIMTCluster()
 {
    return *m_cluster;
 }
-

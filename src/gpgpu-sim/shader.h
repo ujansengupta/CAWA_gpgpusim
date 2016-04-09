@@ -1282,7 +1282,6 @@ struct shader_core_config : public core_config
     mutable l1d_cache_config m_L1D_config;
 
     bool gmem_skip_L1D; // on = global memory access always skip the L1 cache 
-    
     bool gpgpu_dwf_reg_bankconflict;
 
     int gpgpu_num_sched_per_core;
@@ -1452,6 +1451,14 @@ public:
         m_non_rf_operands=(unsigned*) calloc(config->num_shader(),sizeof(unsigned));
         m_n_diverge = (unsigned*) calloc(config->num_shader(),sizeof(unsigned));
         shader_cycle_distro = (unsigned*) calloc(config->warp_size+3, sizeof(unsigned));
+	//******************* TW: 04/07/16 *********************/
+	tw_warp_cta_cycle_dist = (unsigned**) calloc(config->num_shader(), sizeof(unsigned*));
+	for (unsigned i = 0; i < config->num_shader(); i++){
+	  tw_warp_cta_cycle_dist[i] = (unsigned*)calloc(config->max_warps_per_shader, sizeof(unsigned));
+	}
+	tw_num_launched_kernels = 0;
+	tw_with_oracle_cpl = false;
+	//*****************************************************/
         last_shader_cycle_distro = (unsigned*) calloc(m_config->warp_size+3, sizeof(unsigned));
 
         n_simt_to_mem = (long *)calloc(config->num_shader(), sizeof(long));
@@ -1486,6 +1493,12 @@ public:
     void visualizer_print( gzFile visualizer_file );
 
     void print( FILE *fout ) const;
+    
+    //********************* TW: 04/07/16 *******************/
+    void tw_launch_kernel(unsigned kid, unsigned total_cta, unsigned num_warps_per_cta);
+    void tw_store_oracle_cpl(FILE* fp) const;
+    void tw_load_oracle_cpl(FILE* fp);
+    //******************************************************/
 
     const std::vector< std::vector<unsigned> >& get_dynamic_warp_issue() const
     {
@@ -1509,6 +1522,13 @@ private:
     std::vector< std::vector<unsigned> > m_shader_warp_slot_issue_distro;
     std::vector<unsigned> m_last_shader_warp_slot_issue_distro;
 
+    //***************** TW: 04/08/16 ************/
+    std::vector<unsigned**> tw_cpl_actual;
+    unsigned ***tw_cpl_oracle;
+    unsigned **tw_warp_cta_cycle_dist;
+    unsigned tw_num_launched_kernels;
+    bool tw_with_oracle_cpl;
+    //*******************************************/
     friend class power_stat_t;
     friend class shader_core_ctx;
     friend class ldst_unit;
@@ -1541,7 +1561,7 @@ public:
     
     mem_fetch *alloc( const warp_inst_t &inst, const mem_access_t &access ) const
     {
-        warp_inst_t inst_copy = inst;
+      warp_inst_t inst_copy = inst;
         mem_fetch *mf = new mem_fetch(access, 
                                       &inst_copy, 
                                       access.is_write()?WRITE_PACKET_SIZE:READ_PACKET_SIZE,
@@ -1627,6 +1647,7 @@ public:
     void get_L1T_sub_stats(struct cache_sub_stats &css) const;
 
     void get_icnt_power_stats(long &n_simt_to_mem, long &n_mem_to_simt) const;
+
 
 // debug:
     void display_simt_state(FILE *fout, int mask ) const;
@@ -1736,13 +1757,13 @@ public:
 	 void inc_simt_to_mem(unsigned n_flits){ m_stats->n_simt_to_mem[m_sid] += n_flits; }
 	 bool check_if_non_released_reduction_barrier(warp_inst_t &inst);
 
-	private:
-	 unsigned inactive_lanes_accesses_sfu(unsigned active_count,double latency){
+ private:
+    unsigned inactive_lanes_accesses_sfu(unsigned active_count,double latency){
       return  ( ((32-active_count)>>1)*latency) + ( ((32-active_count)>>3)*latency) + ( ((32-active_count)>>3)*latency);
-	 }
-	 unsigned inactive_lanes_accesses_nonsfu(unsigned active_count,double latency){
+    }
+    unsigned inactive_lanes_accesses_nonsfu(unsigned active_count,double latency){
       return  ( ((32-active_count)>>1)*latency);
-	 }
+    }
 
     int test_res_bus(int latency);
     void init_warps(unsigned cta_id, unsigned start_thread, unsigned end_thread);
@@ -1760,6 +1781,12 @@ public:
     void issue_warp( register_set& warp, const warp_inst_t *pI, const active_mask_t &active_mask, unsigned warp_id );
     void func_exec_inst( warp_inst_t &inst );
 
+    //******************* TW: 04/07/16 ****************/
+    unsigned tw_cta_num_in_kernel[MAX_CTA_PER_SHADER];
+    void tw_get_start_end_warp_id(unsigned* start_warp_id, unsigned* end_warp_id, unsigned cta_num) const;
+    void tw_rank_oracle_cpl( unsigned cta_num, unsigned** ranked_oracle_cpl ) const;
+    void tw_record_oracle_cpl( unsigned cta_num );
+    //*************************************************/
      // Returns numbers of addresses in translated_addrs
     unsigned translate_local_memaddr( address_type localaddr, unsigned tid, unsigned num_shader, unsigned datasize, new_addr_type* translated_addrs );
 
@@ -1782,7 +1809,7 @@ public:
     const memory_config *m_memory_config;
     class simt_core_cluster *m_cluster;
 
-    // statistics 
+    // statistics
     shader_core_stats *m_stats;
 
     // CTA scheduling / hardware thread allocation

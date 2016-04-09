@@ -81,7 +81,7 @@ shader_core_ctx::shader_core_ctx( class gpgpu_sim *gpu,
     m_memory_config = mem_config;
     m_stats = stats;
     unsigned warp_size=config->warp_size;
-    
+
     m_sid = shader_id;
     m_tpc = tpc_id;
     
@@ -311,6 +311,9 @@ void shader_core_ctx::reinit(unsigned start_thread, unsigned end_thread, bool re
    for (unsigned i = start_thread / m_config->warp_size; i < end_thread / m_config->warp_size; ++i) {
       m_warp[i].reset();
       m_simt_stack[i]->reset();
+      //************** TW: 04/07/16 ***************/
+      m_stats->tw_warp_cta_cycle_dist[m_sid][i] = 0;
+      //*******************************************/
    }
 }
 
@@ -448,7 +451,6 @@ void shader_core_stats::print( FILE* fout ) const
    for (unsigned i = 3; i < m_config->warp_size + 3; i++) 
       fprintf(fout, "\tW%d:%d", i-2, shader_cycle_distro[i]);
    fprintf(fout, "\n");
-
    m_outgoing_traffic_stats->print(fout); 
    m_incoming_traffic_stats->print(fout); 
 }
@@ -686,6 +688,10 @@ void shader_core_ctx::issue_warp( register_set& pipe_reg_set, const warp_inst_t*
     **pipe_reg = *next_inst; // static instruction information
     (*pipe_reg)->issue( active_mask, warp_id, gpu_tot_sim_cycle + gpu_sim_cycle, m_warp[warp_id].get_dynamic_warp_id() ); // dynamic instruction information
     m_stats->shader_cycle_distro[2+(*pipe_reg)->active_count()]++;
+    //********************* TW: 04/07/16 ************************/
+    assert(warp_id < m_config->max_warps_per_shader);
+    m_stats->tw_warp_cta_cycle_dist[m_sid][warp_id]++;
+    //***********************************************************/
     func_exec_inst( **pipe_reg );
     if( next_inst->op == BARRIER_OP ){
     	m_warp[warp_id].store_info_of_last_inst_at_barrier(*pipe_reg);
@@ -847,7 +853,7 @@ void scheduler_unit::cycle()
                         assert( warp(warp_id).inst_in_pipeline() );
                         if ( (pI->op == LOAD_OP) || (pI->op == STORE_OP) || (pI->op == MEMORY_BARRIER_OP) ) {
                             if( m_mem_out->has_free() ) {
-                                m_shader->issue_warp(*m_mem_out,pI,active_mask,warp_id);
+			      m_shader->issue_warp(*m_mem_out,pI,active_mask,warp_id);
                                 issued++;
                                 issued_inst=true;
                                 warp_inst_issued = true;
@@ -857,13 +863,13 @@ void scheduler_unit::cycle()
                             bool sfu_pipe_avail = m_sfu_out->has_free();
                             if( sp_pipe_avail && (pI->op != SFU_OP) ) {
                                 // always prefer SP pipe for operations that can use both SP and SFU pipelines
-                                m_shader->issue_warp(*m_sp_out,pI,active_mask,warp_id);
+			      m_shader->issue_warp(*m_sp_out,pI,active_mask,warp_id);
                                 issued++;
                                 issued_inst=true;
                                 warp_inst_issued = true;
                             } else if ( (pI->op == SFU_OP) || (pI->op == ALU_SFU_OP) ) {
                                 if( sfu_pipe_avail ) {
-                                    m_shader->issue_warp(*m_sfu_out,pI,active_mask,warp_id);
+				  m_shader->issue_warp(*m_sfu_out,pI,active_mask,warp_id);
                                     issued++;
                                     issued_inst=true;
                                     warp_inst_issued = true;
@@ -1921,6 +1927,9 @@ void shader_core_ctx::register_cta_thread_exit( unsigned cta_num )
       shader_CTA_count_unlog(m_sid, 1);
       printf("GPGPU-Sim uArch: Shader %d finished CTA #%d (%lld,%lld), %u CTAs running\n", m_sid, cta_num, gpu_sim_cycle, gpu_tot_sim_cycle,
              m_n_active_cta );
+      //******************* TW: 04/07/16 **********************/
+      tw_record_oracle_cpl(cta_num);
+      //*******************************************************/
       if( m_n_active_cta == 0 ) {
           assert( m_kernel != NULL );
           m_kernel->dec_running();
