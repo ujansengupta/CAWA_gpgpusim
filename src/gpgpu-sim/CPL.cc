@@ -18,13 +18,13 @@
 //***************** class gpgpu_sim *********************/
 void gpgpu_sim::tw_store_oracle_cpl() const
 {
-  char cwi_name[50];
-  strcpy(cwi_name, m_shader_config->gpgpu_scheduler_string);
-  strcat(cwi_name, ".cwi");
-  FILE* fp = fopen(cwi_name, "r");
+  char cpl_name[50];
+  strcpy(cpl_name, m_shader_config->gpgpu_scheduler_string);
+  strcat(cpl_name, ".cpl");
+  FILE* fp = fopen(cpl_name, "r");
   if (fp == NULL){ // only update oracle information if file not exist
     fclose(fp);
-    fp = fopen(cwi_name, "w");
+    fp = fopen(cpl_name, "w");
     m_shader_stats->tw_store_oracle_cpl(fp);
     fclose(fp);
   }
@@ -34,12 +34,12 @@ void gpgpu_sim::tw_store_oracle_cpl() const
 }
 void gpgpu_sim::tw_load_oracle_cpl()
 {
-  char cwi_name[50];
-  strcpy(cwi_name, m_shader_config->gpgpu_scheduler_string);
-  strcat(cwi_name, ".cwi");
-  FILE* fp = fopen(cwi_name, "r");
-  if (fp){// Only load oracle cwi file if exists
-    printf("Load criticality counter from file %s\n", cwi_name);
+  char cpl_name[50];
+  strcpy(cpl_name, m_shader_config->gpgpu_scheduler_string);
+  strcat(cpl_name, ".cpl");
+  FILE* fp = fopen(cpl_name, "r");
+  if (fp){// Only load oracle cpl file if exists
+    printf("Load criticality counter from file %s\n", cpl_name);
     m_shader_stats->tw_load_oracle_cpl(fp);
     fclose(fp);
   }
