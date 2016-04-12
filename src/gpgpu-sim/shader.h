@@ -1498,6 +1498,9 @@ public:
     void tw_launch_kernel(unsigned kid, unsigned total_cta, unsigned num_warps_per_cta);
     void tw_store_oracle_cpl(FILE* fp) const;
     void tw_load_oracle_cpl(FILE* fp);
+    bool tw_if_with_oracle_cpl() const{
+      return tw_with_oracle_cpl;
+    }
     //******************************************************/
 
     const std::vector< std::vector<unsigned> >& get_dynamic_warp_issue() const

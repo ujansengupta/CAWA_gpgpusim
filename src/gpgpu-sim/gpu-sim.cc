@@ -1081,15 +1081,17 @@ void shader_core_ctx::issue_block2core( kernel_info_t &kernel )
 
     //*********************** TW: 04/07/16 ************************/
     tw_cta_num_in_kernel[free_cta_hw_id] = kernel.tw_next_cta_num();
-    printf("TW: Kernel %d core %d cta %d (block %d in kernel): \n", kernel.get_uid(), m_sid, free_cta_hw_id, kernel.tw_next_cta_num());
-    unsigned *rank_oracle_cpl = NULL;
-    tw_rank_oracle_cpl(free_cta_hw_id, &rank_oracle_cpl);
-    assert(rank_oracle_cpl != NULL);
-    assert(kernel.threads_per_cta() / m_config->warp_size == m_stats->tw_cpl_oracle[kernel.get_uid()-1][0][1]);
-    for (unsigned i = 0; i < kernel.threads_per_cta() / m_config->warp_size; i++){
-      printf("%d ", rank_oracle_cpl[i]);
+    if (m_stats->tw_if_with_oracle_cpl()){  //can only get counter if oracle info loaded
+      printf("TW: Kernel %d core %d cta %d (block %d in kernel): \n", kernel.get_uid(), m_sid, free_cta_hw_id, kernel.tw_next_cta_num());
+      unsigned *rank_oracle_cpl = NULL;
+      tw_rank_oracle_cpl(free_cta_hw_id, &rank_oracle_cpl);
+      assert(rank_oracle_cpl != NULL);
+      assert(kernel.threads_per_cta() / m_config->warp_size == m_stats->tw_cpl_oracle[kernel.get_uid()-1][0][1]);
+      for (unsigned i = 0; i < kernel.threads_per_cta() / m_config->warp_size; i++){
+	printf("%d ", rank_oracle_cpl[i]);
+      }
+      printf("\n");
     }
-    printf("\n");
     //*************************************************************/
 
     // reset the microarchitecture state of the selected hardware thread and warp contexts

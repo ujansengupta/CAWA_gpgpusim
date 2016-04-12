@@ -21,14 +21,9 @@ void gpgpu_sim::tw_store_oracle_cpl() const
   char cpl_name[50];
   strcpy(cpl_name, m_shader_config->gpgpu_scheduler_string);
   strcat(cpl_name, ".cpl");
-  FILE* fp = fopen(cpl_name, "r");
-  if (fp == NULL){ // only update oracle information if file not exist
-    fclose(fp);
-    fp = fopen(cpl_name, "w");
+  if (!m_shader_stats->tw_if_with_oracle_cpl()){
+    FILE* fp = fopen(cpl_name, "w");
     m_shader_stats->tw_store_oracle_cpl(fp);
-    fclose(fp);
-  }
-  else{
     fclose(fp);
   }
 }
@@ -126,6 +121,7 @@ void shader_core_ctx::tw_rank_oracle_cpl(unsigned cta_num, unsigned** ranked_ora
 #ifdef TW_DEBUG
   printf("TW: Kernel %d core %d cta %d (%d in kernel)\'s criticalital warp:", m_kernel->get_uid(), m_sid, cta_num, tw_cta_num_in_kernel[cta_num]);
 #endif
+  assert(m_stats->tw_if_with_oracle_cpl());
   unsigned start_warp_id, end_warp_id;
   tw_get_start_end_warp_id(&start_warp_id, &end_warp_id, cta_num);
   unsigned* cpl_oracle = m_stats->tw_cpl_oracle[m_kernel->get_uid()-1][tw_cta_num_in_kernel[cta_num]+1];
