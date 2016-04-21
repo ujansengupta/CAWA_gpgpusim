@@ -336,10 +336,15 @@ void shader_core_ctx::init_warps( unsigned cta_id, unsigned start_thread, unsign
                 }
             }
             m_simt_stack[i]->launch(start_pc,active_threads);
-            m_warp[i].init(start_pc,cta_id,i,active_threads, m_dynamic_warp_id);
+	    //********************* TW: 04/20/16 *****************/	    
+	    //Load previously stored oracle CPL counters
+	    unsigned oracle_CPL = m_stats->tw_get_oracle_CPL_counter(m_kernel->get_uid()-1, tw_cta_num_in_kernel[cta_id], i - start_warp);
+            m_warp[i].init(start_pc,cta_id,i,active_threads, m_dynamic_warp_id, oracle_CPL);
+	    //****************************************************/
             ++m_dynamic_warp_id;
             m_not_completed += n_active;
-      }
+
+	}
    }
 }
 

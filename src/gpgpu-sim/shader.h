@@ -108,12 +108,19 @@ public:
         m_last_fetch=0;
         m_next=0;
         m_inst_at_barrier=NULL;
+	//*********** TW: 04/20/16 *************/
+	tw_cpl_oracle = 0;
+	tw_cpl_actual = 0;
+	//**************************************/
     }
     void init( address_type start_pc,
                unsigned cta_id,
                unsigned wid,
                const std::bitset<MAX_WARP_SIZE> &active,
-               unsigned dynamic_warp_id )
+               unsigned dynamic_warp_id,
+	       //******* TW: 04/20/16 ********/
+	       int oracle_CPL )
+    //******** TW: 04/20/16*************/
     {
         m_cta_id=cta_id;
         m_warp_id=wid;
@@ -121,9 +128,13 @@ public:
         m_next_pc=start_pc;
         assert( n_completed >= active.count() );
         assert( n_completed <= m_warp_size);
-        n_completed   -= active.count(); // active threads are not yet completed
+        n_completed -= active.count(); // active threads are not yet completed
         m_active_threads = active;
         m_done_exit=false;
+	//*********** TW: 04/20/16 *************/
+        tw_cpl_oracle = oracle_CPL;
+        tw_cpl_actual = 0;
+        //**************************************/ 
     }
 
     bool functional_done() const;
@@ -227,6 +238,12 @@ public:
     unsigned get_dynamic_warp_id() const { return m_dynamic_warp_id; }
     unsigned get_warp_id() const { return m_warp_id; }
 
+    //*************** TW: 04/20/16 *****************/
+    void tw_set_oracle_CPL(int cpl) { tw_cpl_oracle = cpl; }
+    int tw_get_oracle_CPL() const { return tw_cpl_oracle; }
+    int tw_get_actual_CPL() const { return tw_cpl_actual; }
+    //**********************************************/
+
 private:
     static const unsigned IBUFFER_SIZE=2;
     class shader_core_ctx *m_shader;
@@ -260,6 +277,11 @@ private:
 
     unsigned m_stores_outstanding; // number of store requests sent but not yet acknowledged
     unsigned m_inst_in_pipeline;
+
+    //**************** TW: 04/20/16 ******************/
+    int tw_cpl_oracle;
+    int tw_cpl_actual;
+    //************************************************/
 };
 
 
@@ -1287,6 +1309,10 @@ struct shader_core_config : public core_config
     int gpgpu_num_sched_per_core;
     int gpgpu_max_insn_issue_per_warp;
 
+    //************* TW: 04/20/16 *************/
+    bool tw_gpgpu_oracle_cpl; // on = generate oracle CPL for 1st run and use the info at 2nd run
+    //****************************************/
+
     //op collector
     int gpgpu_operand_collector_num_units_sp;
     int gpgpu_operand_collector_num_units_sfu;
@@ -1452,9 +1478,9 @@ public:
         m_n_diverge = (unsigned*) calloc(config->num_shader(),sizeof(unsigned));
         shader_cycle_distro = (unsigned*) calloc(config->warp_size+3, sizeof(unsigned));
 	//******************* TW: 04/07/16 *********************/
-	tw_warp_cta_cycle_dist = (unsigned**) calloc(config->num_shader(), sizeof(unsigned*));
+	tw_warp_cta_cycle_dist = (int**) calloc(config->num_shader(), sizeof(int*));
 	for (unsigned i = 0; i < config->num_shader(); i++){
-	  tw_warp_cta_cycle_dist[i] = (unsigned*)calloc(config->max_warps_per_shader, sizeof(unsigned));
+	  tw_warp_cta_cycle_dist[i] = (int*)calloc(config->max_warps_per_shader, sizeof(int));
 	}
 	tw_num_launched_kernels = 0;
 	tw_with_oracle_cpl = false;
@@ -1501,6 +1527,7 @@ public:
     bool tw_if_with_oracle_cpl() const{
       return tw_with_oracle_cpl;
     }
+    int tw_get_oracle_CPL_counter(unsigned kernel_id, unsigned block_num, unsigned warp_id_within_block) const;
     //******************************************************/
 
     const std::vector< std::vector<unsigned> >& get_dynamic_warp_issue() const
@@ -1526,9 +1553,9 @@ private:
     std::vector<unsigned> m_last_shader_warp_slot_issue_distro;
 
     //***************** TW: 04/08/16 ************/
-    std::vector<unsigned**> tw_cpl_actual;
-    unsigned ***tw_cpl_oracle;
-    unsigned **tw_warp_cta_cycle_dist;
+    std::vector<int**> tw_cpl_actual;
+    int ***tw_cpl_oracle;
+    int **tw_warp_cta_cycle_dist;
     unsigned tw_num_launched_kernels;
     bool tw_with_oracle_cpl;
     //*******************************************/
@@ -1787,8 +1814,11 @@ public:
     //******************* TW: 04/07/16 ****************/
     unsigned tw_cta_num_in_kernel[MAX_CTA_PER_SHADER];
     void tw_get_start_end_warp_id(unsigned* start_warp_id, unsigned* end_warp_id, unsigned cta_num) const;
-    void tw_rank_oracle_cpl( unsigned cta_num, unsigned** ranked_oracle_cpl ) const;
+    void tw_rank_oracle_cpl( unsigned cta_num, int** ranked_oracle_cpl ) const;
     void tw_record_oracle_cpl( unsigned cta_num );
+    std::vector<int> tw_get_current_CPL_counters() const;
+    void tw_print_CPL_counters(unsigned start_id, unsigned end_id) const;
+    void tw_oracle_CPL_sanity_check(unsigned warp_id, int actual_counter) const;
     //*************************************************/
      // Returns numbers of addresses in translated_addrs
     unsigned translate_local_memaddr( address_type localaddr, unsigned tid, unsigned num_shader, unsigned datasize, new_addr_type* translated_addrs );
