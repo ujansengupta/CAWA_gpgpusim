@@ -139,13 +139,13 @@ void shader_core_ctx::tw_record_oracle_cpl(unsigned cta_num)
   printf("\n");
 }
 
-std::vector<int> shader_core_ctx::tw_get_current_CPL_counters() const
+std::vector<float> shader_core_ctx::tw_get_current_CPL_counters() const
 {
-  std::vector<int> ret;
+  std::vector<float> ret;
   for (unsigned i = 0; i < m_warp.size(); i++){
     if (m_config->tw_gpgpu_oracle_cpl){
       assert(m_stats->tw_with_oracle_cpl);
-      ret.push_back(m_warp[i].tw_get_oracle_CPL());
+      ret.push_back(1.0*m_warp[i].tw_get_oracle_CPL());
     }
     else{
       ret.push_back(m_warp[i].tw_get_actual_CPL());
@@ -157,9 +157,9 @@ void shader_core_ctx::tw_print_CPL_counters(unsigned start_id, unsigned end_id) 
 {
 #ifdef TW_DEBUG
   printf("TW: oracle counters loaded for warp %d - warp %d:\n", start_id, end_id);
-  std::vector<int> counters = tw_get_current_CPL_counters();
+  std::vector<float> counters = tw_get_current_CPL_counters();
   for (unsigned i = start_id; i < end_id; i++){
-    printf("W%d: %d, ", i, counters[i]);
+    printf("W%d: %.2f, ", i, counters[i]);
   }
   printf("\n");
 #endif

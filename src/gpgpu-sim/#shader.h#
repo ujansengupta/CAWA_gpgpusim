@@ -241,7 +241,7 @@ public:
     //*************** TW: 04/20/16 *****************/
     void tw_set_oracle_CPL(int cpl) { tw_cpl_oracle = cpl; }
     int tw_get_oracle_CPL() const { return tw_cpl_oracle; }
-    float tw_get_actual_CPL() const { return tw_cpl_actual; }
+    int tw_get_actual_CPL() const { return tw_cpl_actual; }
     //**********************************************/
 
 private:
@@ -280,7 +280,12 @@ private:
 
     //**************** TW: 04/20/16 ******************/
     int tw_cpl_oracle;
+    int tw_cpl_actual;
+    int tw_cpl_nInst;
+    int tw_cpl_nStall;
     float tw_cpl_actual;
+    int tw_num_completed_inst;
+    unsigned tw_warp_init_cycle;
     //************************************************/
 };
 
@@ -1816,7 +1821,7 @@ public:
     void tw_get_start_end_warp_id(unsigned* start_warp_id, unsigned* end_warp_id, unsigned cta_num) const;
     void tw_rank_oracle_cpl( unsigned cta_num, int** ranked_oracle_cpl ) const;
     void tw_record_oracle_cpl( unsigned cta_num );
-    std::vector<float> tw_get_current_CPL_counters() const;
+    std::vector<int> tw_get_current_CPL_counters() const;
     void tw_print_CPL_counters(unsigned start_id, unsigned end_id) const;
     void tw_oracle_CPL_sanity_check(unsigned warp_id, int actual_counter) const;
     //*************************************************/
