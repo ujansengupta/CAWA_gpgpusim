@@ -360,17 +360,22 @@ void shader_core_config::reg_options(class OptionParser * opp)
     option_parser_register(opp, "-gpgpu_num_mem_units", OPT_INT32, &gpgpu_num_mem_units,
                             "Number if ldst units (default=1) WARNING: not hooked up to anything",
                              "1");
+    //*************** TW: 04/22/16 ***************/
     option_parser_register(opp, "-gpgpu_scheduler", OPT_CSTR, &gpgpu_scheduler_string,
-                                "Scheduler configuration: < lrr | gto | two_level_active > "
+                                "Scheduler configuration: < lrr | gto | two_level_active | cawa> "
                                 "If two_level_active:<num_active_warps>:<inner_prioritization>:<outer_prioritization>"
                                 "For complete list of prioritization values see shader.h enum scheduler_prioritization_type"
                                 "Default: gto",
                                  "gto");
-
-    //*************** TW: 04/20/16 ***************/
     option_parser_register(opp, "-gpgpu_with_oracle_cpl", OPT_BOOL, &tw_gpgpu_oracle_cpl,
 			   "Use oracle CPL info or not (default=on)",
 			   "1");
+    option_parser_register(opp, "-gpgpu_oracle_counter_from_scheduler", OPT_CSTR, &tw_gpgpu_oracle_scheduler_string,
+			   "oracle counter from which previous scheduler",
+			   "gto");
+    option_parser_register(opp, "-gpgpu_with_cacp", OPT_BOOL, &dj_gpgpu_with_cacp,
+                           "Use CACP or not (default=off)",
+                           "0");
     //********************************************/
 }
 

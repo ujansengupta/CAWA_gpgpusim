@@ -5,7 +5,7 @@
  ****     ../gpgpusim_entrypoint.cc                   ****
  ****     gpu-sim.cc                                  ****
  ****     shader.cc                                   ****
- ****  04/07/16                                       ****
+ ****  04/07/16 04/20/16                              ****
  *********************************************************/
 
 #include <float.h>
@@ -30,7 +30,7 @@ void gpgpu_sim::tw_store_oracle_cpl() const
 void gpgpu_sim::tw_load_oracle_cpl()
 {
   char cpl_name[50];
-  strcpy(cpl_name, m_shader_config->gpgpu_scheduler_string);
+  strcpy(cpl_name, m_shader_config->tw_gpgpu_oracle_scheduler_string);
   strcat(cpl_name, ".cpl");
   FILE* fp = fopen(cpl_name, "r");
   if (fp){// Only load oracle cpl file if exists
@@ -126,11 +126,13 @@ void shader_core_ctx::tw_record_oracle_cpl(unsigned cta_num)
   unsigned start_warp_id, end_warp_id;
   tw_get_start_end_warp_id(&start_warp_id, &end_warp_id, cta_num); // calculate start and end warp_id
 #ifdef TW_DEBUG
-  tw_print_CPL_counters(start_warp_id, end_warp_id);
+  if (m_stats->tw_with_oracle_cpl) 
+    tw_print_CPL_counters(start_warp_id, end_warp_id);
   printf("TW: Kernel %d core %d cta %d (%d in kernel)\'s warp criticalities:", m_kernel->get_uid(), m_sid, cta_num, tw_cta_num_in_kernel[cta_num]);
 #endif
   for (unsigned i = start_warp_id; i < end_warp_id; i++){
-    tw_oracle_CPL_sanity_check(i, m_stats->tw_warp_cta_cycle_dist[m_sid][i]);
+    if (m_stats->tw_with_oracle_cpl)
+      tw_oracle_CPL_sanity_check(i, m_stats->tw_warp_cta_cycle_dist[m_sid][i]);
 #ifdef TW_DEBUG
     printf("\t W%d: %d", i, m_stats->tw_warp_cta_cycle_dist[m_sid][i]);
 #endif

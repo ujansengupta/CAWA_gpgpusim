@@ -1311,6 +1311,8 @@ struct shader_core_config : public core_config
 
     //************* TW: 04/20/16 *************/
     bool tw_gpgpu_oracle_cpl; // on = generate oracle CPL for 1st run and use the info at 2nd run
+    char* tw_gpgpu_oracle_scheduler_string;
+    bool dj_gpgpu_with_cacp; // on = use cacp; off = no cacp
     //****************************************/
 
     //op collector
