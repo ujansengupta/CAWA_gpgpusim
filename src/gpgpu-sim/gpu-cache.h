@@ -68,7 +68,11 @@ struct cache_block_t {
         m_alloc_time=0;
         m_fill_time=0;
         m_last_access_time=0;
+		recency_cnt=0;
+		c_reuse=0;
+		nc_resue=0;
         m_status=INVALID;
+		
     }
     void allocate( new_addr_type tag, new_addr_type block_addr, unsigned time )
     {
@@ -92,11 +96,24 @@ struct cache_block_t {
     unsigned         m_last_access_time;
     unsigned         m_fill_time;
     cache_block_state    m_status;
+		
+	//*****David-4/21*******************************************/
+	//new cache block members
+	//Exetnd this maybe?
+	int recency_cnt;//for SRRIP replacement policy;
+	bool c_reuse;
+	bool nc_resue;
+	//singature m_sig;//have to figure out how to define this type
+	//*****David-4/21*******************************************/
 };
 
 enum replacement_policy_t {
     LRU,
-    FIFO
+    FIFO,
+	 //*****David-4/21*******************************************/
+	SRRIP
+	 //*****David-4/21*******************************************/
+		
 };
 
 enum write_policy_t {
@@ -164,6 +181,10 @@ public:
         switch (rp) {
         case 'L': m_replacement_policy = LRU; break;
         case 'F': m_replacement_policy = FIFO; break;
+		 //*****David-4/21*******************************************/
+		case 'S': m_replacement_policy = SRRIP; break;
+		 //*****David-4/21*******************************************/
+		
         default: exit_parse_error();
         }
         switch (wp) {
