@@ -85,10 +85,14 @@ public:
    bool m_active; 
 };
 
+class shader_core_ctx;
+class shader_core_config;
+class shader_core_stats;
+
 class shd_warp_t {
 public:
-    shd_warp_t( class shader_core_ctx *shader, unsigned warp_size) 
-        : m_shader(shader), m_warp_size(warp_size)
+ shd_warp_t( class shader_core_ctx *shader, unsigned warp_size) 
+   : m_shader(shader), m_warp_size(warp_size)
     {
         m_stores_outstanding=0;
         m_inst_in_pipeline=0;
@@ -242,6 +246,7 @@ public:
     void tw_set_oracle_CPL(int cpl) { tw_cpl_oracle = cpl; }
     int tw_get_oracle_CPL() const { return tw_cpl_oracle; }
     float tw_get_actual_CPL() const { return tw_cpl_actual; }
+    float tw_get_CPL() const;
     //**********************************************/
      //************************************************/
      //David: 04/21
@@ -283,6 +288,7 @@ private:
     unsigned m_inst_in_pipeline;
 
     //**************** TW: 04/20/16 ******************/
+    bool tw_with_oracle_cpl;
     int tw_cpl_oracle;
     float tw_cpl_actual;
     //************************************************/
@@ -300,9 +306,6 @@ typedef std::bitset<WARP_PER_CTA_MAX> warp_set_t;
 
 int register_bank(int regnum, int wid, unsigned num_banks, unsigned bank_warp_shift);
 
-class shader_core_ctx;
-class shader_core_config;
-class shader_core_stats;
 
 enum scheduler_prioritization_type
 {
@@ -1317,6 +1320,8 @@ struct shader_core_config : public core_config
 
     //************* TW: 04/20/16 *************/
     bool tw_gpgpu_oracle_cpl; // on = generate oracle CPL for 1st run and use the info at 2nd run
+    char* tw_gpgpu_oracle_scheduler_string;
+    bool dj_gpgpu_with_cacp; // on = use cacp; off = no cacp
     //****************************************/
 
     //op collector
@@ -1793,6 +1798,9 @@ public:
 	 void inc_simt_to_mem(unsigned n_flits){ m_stats->n_simt_to_mem[m_sid] += n_flits; }
 	 bool check_if_non_released_reduction_barrier(warp_inst_t &inst);
 
+	 //************** TW: 04/22/16 *************/
+	 bool tw_if_use_oracle_cpl() const;
+	 //*****************************************/
  private:
     unsigned inactive_lanes_accesses_sfu(unsigned active_count,double latency){
       return  ( ((32-active_count)>>1)*latency) + ( ((32-active_count)>>3)*latency) + ( ((32-active_count)>>3)*latency);
