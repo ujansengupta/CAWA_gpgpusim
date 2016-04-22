@@ -1846,8 +1846,7 @@ public:
 	
     //************************************************/
     //David-4/21/2016-Function to calculate per warp criticality, to be called every time tw's counters are refereshed.
-    void calc_warp_criticality_oracle();
-    void calc_warp_criticality_actual();
+    void calc_warp_criticality();
     //*****David-4/21*******************************************/
 		
     // used in display_pipeline():
