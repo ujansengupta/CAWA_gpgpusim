@@ -1282,7 +1282,6 @@ void shader_core_ctx::writeback()
  //*****David-4/21*******************************************/
  void shader_core_ctx:: calc_warp_criticality()
  {
-
 	 int max=0;
 	 //need to add check for first run.
 	 for (long index=0; index<(long)m_warp.size(); ++index) 
