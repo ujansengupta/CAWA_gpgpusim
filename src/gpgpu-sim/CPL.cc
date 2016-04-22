@@ -145,13 +145,7 @@ std::vector<float> shader_core_ctx::tw_get_current_CPL_counters() const
 {
   std::vector<float> ret;
   for (unsigned i = 0; i < m_warp.size(); i++){
-    if (m_config->tw_gpgpu_oracle_cpl){
-      assert(m_stats->tw_with_oracle_cpl);
-      ret.push_back(1.0*m_warp[i].tw_get_oracle_CPL());
-    }
-    else{
-      ret.push_back(m_warp[i].tw_get_actual_CPL());
-    }
+    ret.push_back(m_warp[i].tw_get_CPL());
   }
   return ret;
 }
@@ -174,4 +168,19 @@ void shader_core_ctx::tw_oracle_CPL_sanity_check(unsigned warp_id, int actual_co
     printf("The actual oracle CPL is not the same as the previous one on shader %d warp %d: %d vs %d\n", m_sid, warp_id, m_warp[warp_id].tw_get_oracle_CPL(), actual_counter);
     assert(0);
   }
+}
+
+bool shader_core_ctx::tw_if_use_oracle_cpl() const
+{
+  if (m_config->tw_gpgpu_oracle_cpl){
+    assert(m_stats->tw_with_oracle_cpl);
+    return true;
+  }
+  else
+    return false;
+}
+//***************** class shd_warp_t **************/
+float shd_warp_t::tw_get_CPL() const
+{
+  return m_shader->tw_if_use_oracle_cpl() ? 1.0*tw_cpl_oracle : tw_cpl_actual;
 }
