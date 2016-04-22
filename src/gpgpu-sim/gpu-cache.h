@@ -99,7 +99,6 @@ struct cache_block_t {
 		
 	//*****David-4/21*******************************************/
 	//new cache block members
-	//Exetnd this maybe?
 	int recency_cnt;//for SRRIP replacement policy;
 	bool c_reuse;
 	bool nc_resue;
@@ -572,7 +571,7 @@ class baseline_cache : public cache_t {
 public:
     baseline_cache( const char *name, cache_config &config, int core_id, int type_id, mem_fetch_interface *memport,
                      enum mem_fetch_status status )
-    : m_config(config), m_f(new tag_array(config,core_id,type_id)), 
+    : m_config(config), m_tag_array(new tag_array(config,core_id,type_id)), 
       m_mshrs(config.m_mshr_entries,config.m_mshr_max_merge), 
       m_bandwidth_management(config) 
     {
