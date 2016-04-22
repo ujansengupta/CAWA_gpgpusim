@@ -1280,21 +1280,7 @@ void shader_core_ctx::writeback()
         pipe_reg = (preg==NULL)? NULL:*preg;
     }
 }
- //*****David-4/21*******************************************/
- void shader_core_ctx:: calc_warp_criticality()
- {
-	 int max=0;
-	 //need to add check for first run.
-	 for (long index=0; index<(long)m_warp.size(); ++index) 
-		if(max<m_warp.at(index).tw_cpl_oracle)
-			max=m_warp.at(index).tw_cpl_oracle;
-	 for (long index=0; index<(long)m_warp.size(); ++index) 
-			if(m_warp.at(index).tw_cpl_oracle/max>0.75)
-				m_warp.at(index).criticality=1;
-	 
-	 
- }
- //*****David-4/21*******************************************/
+
 		 
 bool ldst_unit::shared_cycle( warp_inst_t &inst, mem_stage_stall_type &rc_fail, mem_stage_access_type &fail_type)
 {

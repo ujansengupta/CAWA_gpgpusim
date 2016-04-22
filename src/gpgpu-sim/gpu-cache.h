@@ -68,9 +68,9 @@ struct cache_block_t {
         m_alloc_time=0;
         m_fill_time=0;
         m_last_access_time=0;
-		recency_cnt=0;
-		c_reuse=0;
-		nc_resue=0;
+	recency_cnt=0;
+	c_reuse=0;
+	nc_resue=0;
         m_status=INVALID;
 		
     }
@@ -103,7 +103,7 @@ struct cache_block_t {
 	int recency_cnt;//for SRRIP replacement policy;
 	bool c_reuse;
 	bool nc_resue;
-	//singature m_sig;//have to figure out how to define this type
+	int m_sig;//signature for previous access. Update on every hit.
 	//*****David-4/21*******************************************/
 };
 
@@ -572,7 +572,7 @@ class baseline_cache : public cache_t {
 public:
     baseline_cache( const char *name, cache_config &config, int core_id, int type_id, mem_fetch_interface *memport,
                      enum mem_fetch_status status )
-    : m_config(config), m_tag_array(new tag_array(config,core_id,type_id)), 
+    : m_config(config), m_f(new tag_array(config,core_id,type_id)), 
       m_mshrs(config.m_mshr_entries,config.m_mshr_max_merge), 
       m_bandwidth_management(config) 
     {
@@ -971,6 +971,7 @@ protected:
     : data_cache( name,
                   config,
                   core_id,type_id,memport,mfcreator,status, new_tag_array, L1_WR_ALLOC_R, L1_WRBK_ACC ){}
+   
 
 };
 

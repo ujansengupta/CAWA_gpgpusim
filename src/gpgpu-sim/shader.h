@@ -243,9 +243,9 @@ public:
     int tw_get_oracle_CPL() const { return tw_cpl_oracle; }
     float tw_get_actual_CPL() const { return tw_cpl_actual; }
     //**********************************************/
-	//************************************************/
-	//David: 04/21/206
-	//warp criticality divided by max warp criticality in this shader core set to a boolean
+     //************************************************/
+     //David: 04/21
+     //warp criticality divided by max warp criticality in this shader core, set to a boolean
 	bool criticality;
    //************************************************/
 private:
@@ -1837,9 +1837,9 @@ public:
  
 	
     //************************************************/
-	//David-4/21/2016-Function to calculate per warp criticality, to be called every time tw's counters are refereshed.
-	void calc_warp_criticality();
-	
+    //David-4/21/2016-Function to calculate per warp criticality, to be called every time tw's counters are refereshed.
+    void calc_warp_criticality_oracle();
+    void calc_warp_criticality_actual();
     //*****David-4/21*******************************************/
 		
     // used in display_pipeline():
