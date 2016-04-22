@@ -168,7 +168,10 @@ enum cache_request_status tag_array::probe( new_addr_type addr, unsigned &idx ) 
 
     // check for hit or pending hit
     for (unsigned way=0; way<m_config.m_assoc; way++) {
-        unsigned index = set_index*m_config.m_assoc+way;
+		//*****David-4/21*******************************************/
+		//change index assingment based on criticailty
+        //*****David-4/21*******************************************/
+		unsigned index = set_index*m_config.m_assoc+way;
         cache_block_t *line = &m_lines[index];
         if (line->m_tag == tag) {
             if ( line->m_status == RESERVED ) {
@@ -201,6 +204,11 @@ enum cache_request_status tag_array::probe( new_addr_type addr, unsigned &idx ) 
                         valid_line = index;
                     }
                 }
+				//*****David-4/21*******************************************/
+				//add condition for SRRIP miss
+				//*****David-4/21*******************************************/
+		
+		
             }
         }
     }
@@ -236,14 +244,27 @@ enum cache_request_status tag_array::access( new_addr_type addr, unsigned time, 
     case HIT_RESERVED: 
         m_pending_hit++;
     case HIT: 
-        m_lines[idx].m_last_access_time=time; 
+		//*****David-4/21*******************************************/
+		//call CACP HIT function in extended object.
+		//call SRRIP HIT function in extended object.
+        //*****David-4/21*******************************************/
+		
+		m_lines[idx].m_last_access_time=time; 
         break;
     case MISS:
         m_miss++;
+		//*****David-4/21*******************************************/
+		//call CACP Insertion/Fill function in extended object.
+		 //*****David-4/21*******************************************/
+		
+		
         shader_cache_access_log(m_core_id, m_type_id, 1); // log cache misses
         if ( m_config.m_alloc_policy == ON_MISS ) {
             if( m_lines[idx].m_status == MODIFIED ) {
                 wb = true;
+				
+				//*****David-4/21*******************************************/
+				//call CACP eviction function in extended object.
                 evicted = m_lines[idx];
             }
             m_lines[idx].allocate( m_config.tag(addr), m_config.block_addr(addr), time );
