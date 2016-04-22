@@ -54,6 +54,7 @@
 
 /////////////////////////////////////////////////////////////////////////////
 
+
 std::list<unsigned> shader_core_ctx::get_regs_written( const inst_t &fvt ) const
 {
    std::list<unsigned> result;
