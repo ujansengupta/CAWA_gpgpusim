@@ -373,6 +373,15 @@ void shader_core_config::reg_options(class OptionParser * opp)
     option_parser_register(opp, "-gpgpu_oracle_counter_from_scheduler", OPT_CSTR, &tw_gpgpu_oracle_scheduler_string,
 			   "oracle counter from which previous scheduler",
 			   "gto");
+    option_parser_register(opp, "-gpgpu_actual_cpl_static_ninst", OPT_BOOL, &tw_actual_cpl_static_ninst,
+			   "use static number of instructions in each warp or not",
+			   "0");
+    option_parser_register(opp, "-gpgpu_actual_cpl_real_cpi", OPT_BOOL, &tw_actual_cpl_real_cpi,
+			   "use calculated average CPI or not",
+			   "0");
+    option_parser_register(opp, "-gpgpu_actual_cpl_stall", OPT_BOOL, &tw_actual_cpl_stall,
+			   "use stalling info or not",
+			   "0");
     option_parser_register(opp, "-gpgpu_with_cacp", OPT_BOOL, &dj_gpgpu_with_cacp,
                            "Use CACP or not (default=off)",
                            "0");

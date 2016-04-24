@@ -115,6 +115,11 @@ public:
 	//*********** TW: 04/20/16 *************/
 	tw_cpl_oracle = 0;
 	tw_cpl_actual = 0;
+	tw_nInst = 0;
+        tw_nStall = 0;
+        tw_warp_entered_cycle = 0;
+        tw_num_completed_inst = 0;
+        tw_last_schedule_cycle = 0;
 	//**************************************/
     }
     void init( address_type start_pc,
@@ -138,6 +143,11 @@ public:
 	//*********** TW: 04/20/16 *************/
         tw_cpl_oracle = oracle_CPL;
         tw_cpl_actual = 0;
+	tw_nInst = 0;
+	tw_nStall = 0;
+	tw_warp_entered_cycle = 0;
+	tw_num_completed_inst = 0;
+	tw_last_schedule_cycle = 0;
         //**************************************/ 
     }
 
@@ -244,9 +254,13 @@ public:
 
     //*************** TW: 04/20/16 *****************/
     void tw_set_oracle_CPL(int cpl) { tw_cpl_oracle = cpl; }
-    int tw_get_oracle_CPL() const { return tw_cpl_oracle; }
-    float tw_get_actual_CPL() const { return tw_cpl_actual; }
     float tw_get_CPL() const;
+    int tw_get_oracle_CPL() const { return tw_cpl_oracle; }
+    //*************** TW: 04/20/16 *****************/
+    void tw_warp_enter(unsigned cycle, unsigned ninst);
+    void tw_warp_issue(unsigned cycle, address_type npc, unsigned isize);
+    void tw_warp_complete();
+    void tw_cpl_calculate(bool avg_cpi, bool stall, unsigned cycle);
     //**********************************************/
 
 private:
@@ -287,6 +301,14 @@ private:
     bool tw_with_oracle_cpl;
     int tw_cpl_oracle;
     float tw_cpl_actual;
+    //**************** TW: 04/22/16 ******************/
+    int tw_nInst;
+    unsigned tw_nStall;
+    // For avg CPI
+    unsigned tw_warp_entered_cycle;
+    unsigned tw_num_completed_inst;
+    // For nStall
+    unsigned tw_last_schedule_cycle;
     //************************************************/
 };
 
@@ -1314,7 +1336,10 @@ struct shader_core_config : public core_config
 
     //************* TW: 04/20/16 *************/
     bool tw_gpgpu_oracle_cpl; // on = generate oracle CPL for 1st run and use the info at 2nd run
-    char* tw_gpgpu_oracle_scheduler_string;
+    char* tw_gpgpu_oracle_scheduler_string; // oracle CPL should be get from which previous scheduler info
+    bool tw_actual_cpl_static_ninst; // on = use static number of inst, off = use zero
+    bool tw_actual_cpl_real_cpi; // on = use average cpi, off = assume cpi for all warps are the same (1.0)
+    bool tw_actual_cpl_stall; // on = consider stall cycles
     bool dj_gpgpu_with_cacp; // on = use cacp; off = no cacp
     //****************************************/
 
@@ -1824,9 +1849,13 @@ public:
     void tw_get_start_end_warp_id(unsigned* start_warp_id, unsigned* end_warp_id, unsigned cta_num) const;
     void tw_rank_oracle_cpl( unsigned cta_num, int** ranked_oracle_cpl ) const;
     void tw_record_oracle_cpl( unsigned cta_num );
+    //******************* TW: 04/22/16 ****************/
     std::vector<float> tw_get_current_CPL_counters() const;
     void tw_print_CPL_counters(unsigned start_id, unsigned end_id) const;
     void tw_oracle_CPL_sanity_check(unsigned warp_id, int actual_counter) const;
+    void tw_calculate_cpl(unsigned cycle);
+    unsigned tw_get_static_ninst(unsigned warp_id);
+    address_type tw_calculate_npc_per_warp(unsigned warp_id);
     //*************************************************/
      // Returns numbers of addresses in translated_addrs
     unsigned translate_local_memaddr( address_type localaddr, unsigned tid, unsigned num_shader, unsigned datasize, new_addr_type* translated_addrs );

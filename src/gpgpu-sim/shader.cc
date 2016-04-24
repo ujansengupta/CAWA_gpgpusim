@@ -340,6 +340,7 @@ void shader_core_ctx::init_warps( unsigned cta_id, unsigned start_thread, unsign
 	    //Load previously stored oracle CPL counters
 	    unsigned oracle_CPL = m_stats->tw_get_oracle_CPL_counter(m_kernel->get_uid()-1, tw_cta_num_in_kernel[cta_id], i - start_warp);
             m_warp[i].init(start_pc,cta_id,i,active_threads, m_dynamic_warp_id, oracle_CPL);
+	    m_warp[i].tw_warp_enter(gpu_tot_sim_cycle+gpu_sim_cycle, tw_get_static_ninst(i));
 	    //****************************************************/
             ++m_dynamic_warp_id;
             m_not_completed += n_active;
@@ -705,17 +706,23 @@ void shader_core_ctx::issue_warp( register_set& pipe_reg_set, const warp_inst_t*
     }else if( next_inst->op == MEMORY_BARRIER_OP ){
         m_warp[warp_id].set_membar();
     }
-
+    //********************* TW: 04/22/16 ***********************/
+    address_type npc = tw_calculate_npc_per_warp(warp_id);
+    m_warp[warp_id].tw_warp_issue(gpu_tot_sim_cycle+gpu_sim_cycle, npc, next_inst->isize);
+    //**********************************************************/
     updateSIMTStack(warp_id,*pipe_reg);
     m_scoreboard->reserveRegisters(*pipe_reg);
     m_warp[warp_id].set_next_pc(next_inst->pc + next_inst->isize);
 }
 
 void shader_core_ctx::issue(){
-    //really is issue;
-    for (unsigned i = 0; i < schedulers.size(); i++) {
-        schedulers[i]->cycle();
-    }
+  //*************** TW: 04/23/16 ***************/
+  tw_calculate_cpl(gpu_tot_sim_cycle + gpu_sim_cycle);
+  //********************************************/
+  //really is issue;
+  for (unsigned i = 0; i < schedulers.size(); i++) {
+    schedulers[i]->cycle();
+  }
 }
 
 shd_warp_t& scheduler_unit::warp(int i){
@@ -1269,6 +1276,9 @@ void shader_core_ctx::writeback()
         unsigned warp_id = pipe_reg->warp_id();
         m_scoreboard->releaseRegisters( pipe_reg );
         m_warp[warp_id].dec_inst_in_pipeline();
+	//**************** TW: 04/22/16 ***************/
+	m_warp[warp_id].tw_warp_complete();
+	//*********************************************/
         warp_inst_complete(*pipe_reg);
         m_gpu->gpu_sim_insn_last_update_sid = m_sid;
         m_gpu->gpu_sim_insn_last_update = gpu_sim_cycle;
