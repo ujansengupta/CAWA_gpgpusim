@@ -70,7 +70,7 @@ struct cache_block_t {
         m_last_access_time=0;
 	
 	c_reuse=0;
-	nc_resue=0;
+	nc_reuse=0;
         m_status=INVALID;
 		
     }
@@ -101,7 +101,7 @@ struct cache_block_t {
 	//new cache block members
 	//int recency_cnt;//for SRRIP replacement policy;
 	bool c_reuse;
-	bool nc_resue;
+	bool nc_reuse;
 	int sig;//signature for previous access. Update on every hit.
 	//*****David-4/21*******************************************/
 };
@@ -177,9 +177,7 @@ public:
         switch (rp) {
         case 'L': m_replacement_policy = LRU; break;
         case 'F': m_replacement_policy = FIFO; break;
-		 //*****David-4/21*******************************************/
-		case 'S': m_replacement_policy = SRRIP; break;
-		 //*****David-4/21*******************************************/
+		
 		
         default: exit_parse_error();
         }
@@ -287,7 +285,10 @@ public:
     char *m_config_stringPrefL1;
     char *m_config_stringPrefShared;
     FuncCache cache_status;
-
+    unsigned m_assoc;
+     enum allocation_policy_t m_alloc_policy;        // 'm' = allocate on miss, 'f' = allocate on fill
+   
+    unsigned m_nset;
 protected:
     void exit_parse_error()
     {
@@ -299,13 +300,12 @@ protected:
     bool m_disabled;
     unsigned m_line_sz;
     unsigned m_line_sz_log2;
-    unsigned m_nset;
+    
     unsigned m_nset_log2;
-    unsigned m_assoc;
+    
 
     enum replacement_policy_t m_replacement_policy; // 'L' = LRU, 'F' = FIFO
     enum write_policy_t m_write_policy;             // 'T' = write through, 'B' = write back, 'R' = read only
-    enum allocation_policy_t m_alloc_policy;        // 'm' = allocate on miss, 'f' = allocate on fill
     enum mshr_config_t m_mshr_type;
 
     write_allocate_policy_t m_write_alloc_policy;	// 'W' = Write allocate, 'N' = No write allocate
@@ -409,27 +409,28 @@ class tag_array_CACP :public tag_array{
 	int *CCBP;
 	int *SHiP;
 	public:
-	tag_array_CACP(cache_config &config, int core_id, int type_id ){
-		super(); 
+	tag_array_CACP(cache_config &config, int core_id, int type_id ):tag_array(config,
+                       core_id, type_id ){
+		
 		CCBP=new int[256]; 
 		SHiP=new int[256]; 
 		for(int i=0;i<256;i++)
 			SHiP[i]=3;
 		for(int i=0;i<256;i++)
 			CCBP[i]=1;//Currently setting to 1. need to experiment for better values.
-	};
-	 enum cache_request_status probe( new_addr_type addr, unsigned &idx, bool critical ) const;
+	}
+	 enum cache_request_status probe( new_addr_type addr, unsigned &idx, bool critical );
 	 void cacp_hit(bool critical, unsigned &idx);
 	 void cacp_eviction(unsigned &idx, unsigned set_index);
 	protected:
-	tag_array_CACP( cache_config &config, int core_id, int type_id, cache_block_t* new_lines ){
+	tag_array_CACP( cache_config &config, int core_id, int type_id, cache_block_t* new_lines ):tag_array( config, core_id, type_id, new_lines){
 		CCBP=new int[256]; 
 		SHiP=new int[256]; 
 		for(int i=0;i<256;i++)
 			SHiP[i]=3;
 		for(int i=0;i<256;i++)
 			CCBP[i]=1;
-   };
+   }
   
 };
 //*****David-4/24*******************************************/
@@ -1026,7 +1027,7 @@ protected:
               mem_fetch_interface *memport,
               mem_fetch_allocator *mfcreator,
               enum mem_fetch_status status,
-              tag_array_cacp* new_tag_array )
+              tag_array_CACP* new_tag_array )
     : data_cache( name,
                   config,
                   core_id,type_id,memport,mfcreator,status, new_tag_array, L1_WR_ALLOC_R, L1_WRBK_ACC ){}

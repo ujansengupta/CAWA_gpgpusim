@@ -1629,7 +1629,7 @@ ldst_unit::ldst_unit( mem_fetch_interface *icnt,
 		//*****David-4/22*******************************************/
 		//Checking if CACP enabled
 		if(m_config->dj_gpgpu_with_cacp)
-		 m_L1D = new l1_cache_cacp( L1D_name,
+		 m_L1D = (l1_cache*)new l1_cache_cacp( L1D_name,
                               m_config->m_L1D_config,
                               m_sid,
                               get_shader_normal_cache_id(),

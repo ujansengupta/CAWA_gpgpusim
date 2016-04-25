@@ -26,7 +26,7 @@
  }
 
 
-enum cache_request_status tag_array_CACP::probe( new_addr_type addr, unsigned &idx, bool critical ) const {
+enum cache_request_status tag_array_CACP::probe( new_addr_type addr, unsigned &idx, bool critical )  {
     //assert( m_config.m_write_policy == READ_ONLY );
     //*****David-4/21*******************************************/
 	unsigned signature;
@@ -49,7 +49,7 @@ enum cache_request_status tag_array_CACP::probe( new_addr_type addr, unsigned &i
     unsigned valid_timestamp = (unsigned)-1;
 	
     bool all_reserved = true;
-    int way;
+    unsigned way;
     // check for hit or pending hit
     for (way=0; way<m_config.m_assoc; way++) {
 		
@@ -57,7 +57,7 @@ enum cache_request_status tag_array_CACP::probe( new_addr_type addr, unsigned &i
         cache_block_t *line = &m_lines[index];
         if (line->m_tag == tag) {
             if ( line->m_status == RESERVED ) {
-                idx = index;
+                idx = index;	
                
 				//*****David-4/21*******************************************/
 				//call CACP HIT function in extended object.
@@ -122,8 +122,8 @@ enum cache_request_status tag_array_CACP::probe( new_addr_type addr, unsigned &i
 			}
 			if(way==m_config.m_assoc-1){
 				//means no lines with RRPV=3 were found
-				for (int i=0; i<m_config.m_assoc; i++){
-					int index = set_index*m_config.m_assoc+i;
+				for (unsigned i=0; i<m_config.m_assoc; i++){
+					unsigned index = set_index*m_config.m_assoc+i;
 					cache_block_t *line = &m_lines[index];
 					SHiP[line->sig]++;
 				}
