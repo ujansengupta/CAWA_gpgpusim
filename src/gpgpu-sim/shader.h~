@@ -488,7 +488,7 @@ public:
     virtual void done_adding_supervised_warps() {
         m_last_supervised_issued = m_supervised_warps.begin();		//Check whether to keep it as m-sup_warps.begin or end//
     }
-};
+}
 
 //---------US - 4/22-----------//
 

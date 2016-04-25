@@ -131,8 +131,8 @@ void shader_core_ctx::tw_record_oracle_cpl(unsigned cta_num)
   printf("TW: Kernel %d core %d cta %d (%d in kernel)\'s warp criticalities:", m_kernel->get_uid(), m_sid, cta_num, tw_cta_num_in_kernel[cta_num]);
 #endif
   for (unsigned i = start_warp_id; i < end_warp_id; i++){
-    //if (m_stats->tw_with_oracle_cpl)
-      //tw_oracle_CPL_sanity_check(i, m_stats->tw_warp_cta_cycle_dist[m_sid][i]);
+    if (m_stats->tw_with_oracle_cpl)
+      tw_oracle_CPL_sanity_check(i, m_stats->tw_warp_cta_cycle_dist[m_sid][i]);
 #ifdef TW_DEBUG
     printf("\t W%d: %d", i, m_stats->tw_warp_cta_cycle_dist[m_sid][i]);
 #endif
