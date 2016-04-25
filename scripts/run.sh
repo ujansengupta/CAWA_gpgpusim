@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
-SRC_PATH=gpgpusim
+SRC_PATH=gpgpu-sim_distribution
 OUT=results.txt
-FIRST=yes
+FIRST=no
 CACP=no
 
 #take parameters
@@ -69,12 +69,13 @@ then
     then
 	sh README.GPGPU-Sim
     else
+	OUT=results.$SCHED.txt
 	if [ -f $OUT ]
 	then
 	    rm $OUT
 	fi
 	sh README.GPGPU-Sim > $OUT || true
-	less $OUT
+	../../scripts/sum.py $OUT
     fi
 else
     gdb --args `cat README.GPGPU-Sim`
