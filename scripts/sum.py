@@ -9,4 +9,4 @@ import sys
 f=open(sys.argv[1])
 contents=f.read()
 f.close()
-print find_cycle(contents, 'gpu_sim_cycle = [\d]+')
+print find_pattern(contents, 'gpu_sim_cycle = [\d]+')
