@@ -33,12 +33,14 @@ enum cache_request_status tag_array_CACP::probe( new_addr_type addr, unsigned &i
 	//unsigned signature=last 8 bits of PC and request addrees. Needs PC address sent here.
 	//change index assingment based on predicted criticality
     unsigned set_index = m_config.set_index(addr);
-	if(CCBP[signature]>=2)
+	if(CCBP[signature]>=2){
 		if(set_index>(m_config.m_nset)/2-1)
 			set_index-=(m_config.m_nset)/2;
-	else
+	}
+	else{
 		if(set_index<(m_config.m_nset)/2)
 			set_index+=(m_config.m_nset)/2; 
+	}
 	//*****David-4/21*******************************************/
 	new_addr_type tag = m_config.tag(addr);
 
@@ -47,9 +49,9 @@ enum cache_request_status tag_array_CACP::probe( new_addr_type addr, unsigned &i
     unsigned valid_timestamp = (unsigned)-1;
 	
     bool all_reserved = true;
-
+    int way;
     // check for hit or pending hit
-    for (unsigned way=0; way<m_config.m_assoc; way++) {
+    for (way=0; way<m_config.m_assoc; way++) {
 		
 		unsigned index = set_index*m_config.m_assoc+way;
         cache_block_t *line = &m_lines[index];
@@ -109,7 +111,7 @@ enum cache_request_status tag_array_CACP::probe( new_addr_type addr, unsigned &i
 			*/	
 			//*****David-4/24*******************************************/
 			//Modelling SRRIP Miss- David 4/24.
-			if(SHiP[line.sig]==3)
+			if(SHiP[line->sig]==3)
 			{
 				//line with RRPV=3 found, replace it.
 				invalid_line=index;
@@ -120,8 +122,8 @@ enum cache_request_status tag_array_CACP::probe( new_addr_type addr, unsigned &i
 			}
 			if(way==m_config.m_assoc-1){
 				//means no lines with RRPV=3 were found
-				for (unsigned way=0; way<m_config.m_assoc; way++){
-					unsigned index = set_index*m_config.m_assoc+way;
+				for (int i=0; i<m_config.m_assoc; i++){
+					int index = set_index*m_config.m_assoc+i;
 					cache_block_t *line = &m_lines[index];
 					SHiP[line->sig]++;
 				}
@@ -144,10 +146,10 @@ enum cache_request_status tag_array_CACP::probe( new_addr_type addr, unsigned &i
 	
 	//call CACP eviction function in extended object.
 	//*****David-4/24*******************************************/
-	 if( m_lines[idx].m_status == MODIFIED ){
-		 cacp_eviction(idx, set_index)
+	 if( m_lines[idx].m_status == MODIFIED )
+		 cacp_eviction(idx, set_index);
 		 
-	 }
+	 
 		//*****David-4/24*******************************************/ 
     return MISS;
 }
@@ -170,13 +172,16 @@ void tag_array_CACP::cacp_hit(bool critical, unsigned &idx){
 	
 }
 void tag_array_CACP::cacp_eviction(unsigned &idx, unsigned set_index){
-	cache_block_t &evicted;
-	evicted=m_lines[idx];
+	cache_block_t &evicted=m_lines[idx];
+	int signature=evicted.sig;
 	if(!evicted.c_reuse && evicted.nc_reuse && set_index<=(m_config.m_nset)/2-1)
+	{	
 		if(CCBP[signature]!=0)
 			CCBP[evicted.sig]--;
-	else if(!evicted.c_reuse && !evicted.nc_reuse)
+	}
+	else if(!evicted.c_reuse && !evicted.nc_reuse){
 		if(SHiP[signature]!=0)
 			SHiP[evicted.sig]--;
+	}
 			
 }
