@@ -21,11 +21,9 @@ void gpgpu_sim::tw_store_oracle_cpl() const
   char cpl_name[50];
   strcpy(cpl_name, m_shader_config->gpgpu_scheduler_string);
   strcat(cpl_name, ".cpl");
-  if (!m_shader_stats->tw_if_with_oracle_cpl()){
-    FILE* fp = fopen(cpl_name, "w");
-    m_shader_stats->tw_store_oracle_cpl(fp);
-    fclose(fp);
-  }
+  FILE* fp = fopen(cpl_name, "w");
+  m_shader_stats->tw_store_oracle_cpl(fp);
+  fclose(fp);
 }
 void gpgpu_sim::tw_load_oracle_cpl()
 {
@@ -33,7 +31,11 @@ void gpgpu_sim::tw_load_oracle_cpl()
   strcpy(cpl_name, m_shader_config->tw_gpgpu_oracle_scheduler_string);
   strcat(cpl_name, ".cpl");
   FILE* fp = fopen(cpl_name, "r");
-  if (fp){// Only load oracle cpl file if exists
+  if (m_shader_config->tw_gpgpu_load_oracle_counter){
+    if (fp == NULL){
+      printf("The oracle counter for scheduler %s not exists\n", m_shader_config->tw_gpgpu_oracle_scheduler_string);
+      assert(0);
+    }
     printf("Load criticality counter from file %s\n", cpl_name);
     m_shader_stats->tw_load_oracle_cpl(fp);
     fclose(fp);
@@ -173,7 +175,7 @@ void shader_core_ctx::tw_oracle_CPL_sanity_check(unsigned warp_id, int actual_co
 bool shader_core_ctx::tw_if_use_oracle_cpl() const
 {
   if (m_config->tw_gpgpu_oracle_cpl){
-    assert(m_stats->tw_with_oracle_cpl);
+    assert (m_stats->tw_with_oracle_cpl);
     return true;
   }
   else

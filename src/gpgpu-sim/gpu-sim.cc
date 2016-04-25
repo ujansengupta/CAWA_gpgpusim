@@ -370,6 +370,9 @@ void shader_core_config::reg_options(class OptionParser * opp)
     option_parser_register(opp, "-gpgpu_with_oracle_cpl", OPT_BOOL, &tw_gpgpu_oracle_cpl,
 			   "Use oracle CPL info or not (default=on)",
 			   "1");
+    option_parser_register(opp, "-gpgpu_load_oracle_counter", OPT_BOOL, &tw_gpgpu_load_oracle_counter,
+			   "Load oracle CPL info or not (default=on)",
+			   "0");
     option_parser_register(opp, "-gpgpu_oracle_counter_from_scheduler", OPT_CSTR, &tw_gpgpu_oracle_scheduler_string,
 			   "oracle counter from which previous scheduler",
 			   "gto");
