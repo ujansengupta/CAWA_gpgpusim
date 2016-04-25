@@ -68,7 +68,7 @@ struct cache_block_t {
         m_alloc_time=0;
         m_fill_time=0;
         m_last_access_time=0;
-	recency_cnt=0;
+	
 	c_reuse=0;
 	nc_resue=0;
         m_status=INVALID;
@@ -99,20 +99,17 @@ struct cache_block_t {
 		
 	//*****David-4/21*******************************************/
 	//new cache block members
-	int recency_cnt;//for SRRIP replacement policy;
+	//int recency_cnt;//for SRRIP replacement policy;
 	bool c_reuse;
 	bool nc_resue;
-	int m_sig;//signature for previous access. Update on every hit.
+	int sig;//signature for previous access. Update on every hit.
 	//*****David-4/21*******************************************/
 };
 
 enum replacement_policy_t {
     LRU,
     FIFO,
-	 //*****David-4/21*******************************************/
-	SRRIP
-	 //*****David-4/21*******************************************/
-		
+
 };
 
 enum write_policy_t {
@@ -407,12 +404,35 @@ protected:
     int m_core_id; // which shader core is using this
     int m_type_id; // what kind of cache is this (normal, texture, constant)
 };
-//*****David-4/22*******************************************/
+//*****David-4/24*******************************************/
 class tag_array_CACP :public tag_array{
+	int *CCBP;
+	int *SHiP;
+	public:
+	tag_array_CACP(cache_config &config, int core_id, int type_id ){
+		super(); 
+		CCBP=new int[256]; 
+		SHiP=new int[256]; 
+		for(int i=0;i<256;i++)
+			SHiP[i]=3;
+		for(int i=0;i<256;i++)
+			CCBP[i]=1;//Currently setting to 1. need to experiment for better values.
+	};
 	 enum cache_request_status probe( new_addr_type addr, unsigned &idx, bool critical ) const;
+	 void cacp_hit(bool critical, unsigned &idx);
+	 void cacp_eviction(unsigned &idx, unsigned set_index);
+	protected:
+	tag_array_CACP( cache_config &config, int core_id, int type_id, cache_block_t* new_lines ){
+		CCBP=new int[256]; 
+		SHiP=new int[256]; 
+		for(int i=0;i<256;i++)
+			SHiP[i]=3;
+		for(int i=0;i<256;i++)
+			CCBP[i]=1;
+   };
   
 };
-//*****David-4/22*******************************************/
+//*****David-4/24*******************************************/
 class mshr_table {
 public:
     mshr_table( unsigned num_entries, unsigned max_merged )
@@ -978,8 +998,13 @@ protected:
    
 
 };
+
+//*****David-4/24*******************************************/
+//CACP version of L1 cache
 class l1_cache_cacp : public data_cache {
 public:
+	
+	
     l1_cache_cacp(const char *name, cache_config &config,
             int core_id, int type_id, mem_fetch_interface *memport,
             mem_fetch_allocator *mfcreator, enum mem_fetch_status status )
@@ -1001,13 +1026,14 @@ protected:
               mem_fetch_interface *memport,
               mem_fetch_allocator *mfcreator,
               enum mem_fetch_status status,
-              tag_array* new_tag_array )
+              tag_array_cacp* new_tag_array )
     : data_cache( name,
                   config,
                   core_id,type_id,memport,mfcreator,status, new_tag_array, L1_WR_ALLOC_R, L1_WRBK_ACC ){}
    
 
 };
+//*****David-4/24*******************************************/
 /// Models second level shared cache with global write-back
 /// and write-allocate policies
 class l2_cache : public data_cache {

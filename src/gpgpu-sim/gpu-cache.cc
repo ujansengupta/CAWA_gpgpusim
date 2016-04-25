@@ -1099,6 +1099,8 @@ l1_cache::access( new_addr_type addr,
 {
     return data_cache::access( addr, mf, time, events );
 }
+//*****David-4/24*******************************************/
+//adding cacp access copy
 enum cache_request_status
 l1_cache_cacp::access( new_addr_type addr,
                   mem_fetch *mf,
@@ -1107,7 +1109,7 @@ l1_cache_cacp::access( new_addr_type addr,
 {
     return data_cache::access( addr, mf, time, events );
 }
-
+//*****David-4/24*******************************************/
 // The l2 cache access function calls the base data_cache access
 // implementation.  When the L2 needs to diverge from L1, L2 specific
 // changes should be made here.
