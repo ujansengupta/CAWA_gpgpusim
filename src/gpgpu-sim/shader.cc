@@ -1626,6 +1626,18 @@ ldst_unit::ldst_unit( mem_fetch_interface *icnt,
     if( !m_config->m_L1D_config.disabled() ) {
         char L1D_name[STRSIZE];
         snprintf(L1D_name, STRSIZE, "L1D_%03d", m_sid);
+		//*****David-4/22*******************************************/
+		//Checking if CACP enabled
+		if(m_config->dj_gpgpu_with_cacp)
+		 m_L1D = new l1_cache_cacp( L1D_name,
+                              m_config->m_L1D_config,
+                              m_sid,
+                              get_shader_normal_cache_id(),
+                              m_icnt,
+                              m_mf_allocator,
+                              IN_L1D_MISS_QUEUE );
+		else
+			//*****David-4/22*******************************************/
         m_L1D = new l1_cache( L1D_name,
                               m_config->m_L1D_config,
                               m_sid,

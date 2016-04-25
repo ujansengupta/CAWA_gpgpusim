@@ -195,8 +195,8 @@ public:
         default: exit_parse_error();
         }
         switch (ap) {
-        case 'm': m_alloc_policy = ON_MISS; break;
-        case 'f': m_alloc_policy = ON_FILL; break;
+			case 'm': m_alloc_policy = ON_MISS; break;
+			case 'f': m_alloc_policy = ON_FILL; break;
         default: exit_parse_error();
         }
         switch (mshr_type) {
@@ -407,7 +407,12 @@ protected:
     int m_core_id; // which shader core is using this
     int m_type_id; // what kind of cache is this (normal, texture, constant)
 };
-
+//*****David-4/22*******************************************/
+class tag_array_CACP :public tag_array{
+	 enum cache_request_status probe( new_addr_type addr, unsigned &idx, bool critical ) const;
+  
+};
+//*****David-4/22*******************************************/
 class mshr_table {
 public:
     mshr_table( unsigned num_entries, unsigned max_merged )
@@ -973,7 +978,36 @@ protected:
    
 
 };
+class l1_cache_cacp : public data_cache {
+public:
+    l1_cache_cacp(const char *name, cache_config &config,
+            int core_id, int type_id, mem_fetch_interface *memport,
+            mem_fetch_allocator *mfcreator, enum mem_fetch_status status )
+            : data_cache(name,config,core_id,type_id,memport,mfcreator,status, L1_WR_ALLOC_R, L1_WRBK_ACC){}
 
+    virtual ~l1_cache_cacp(){}
+
+    virtual enum cache_request_status
+        access( new_addr_type addr,
+                mem_fetch *mf,
+                unsigned time,
+                std::list<cache_event> &events );
+
+protected:
+    l1_cache_cacp( const char *name,
+              cache_config &config,
+              int core_id,
+              int type_id,
+              mem_fetch_interface *memport,
+              mem_fetch_allocator *mfcreator,
+              enum mem_fetch_status status,
+              tag_array* new_tag_array )
+    : data_cache( name,
+                  config,
+                  core_id,type_id,memport,mfcreator,status, new_tag_array, L1_WR_ALLOC_R, L1_WRBK_ACC ){}
+   
+
+};
 /// Models second level shared cache with global write-back
 /// and write-allocate policies
 class l2_cache : public data_cache {

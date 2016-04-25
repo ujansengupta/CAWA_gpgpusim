@@ -168,22 +168,20 @@ enum cache_request_status tag_array::probe( new_addr_type addr, unsigned &idx ) 
 
     // check for hit or pending hit
     for (unsigned way=0; way<m_config.m_assoc; way++) {
-		//*****David-4/21*******************************************/
-		//change index assingment based on criticailty
-        //*****David-4/21*******************************************/
 		unsigned index = set_index*m_config.m_assoc+way;
         cache_block_t *line = &m_lines[index];
         if (line->m_tag == tag) {
             if ( line->m_status == RESERVED ) {
                 idx = index;
                 return HIT_RESERVED;
+			
             } else if ( line->m_status == VALID ) {
                 idx = index;
                 return HIT;
-            } else if ( line->m_status == MODIFIED ) {
+		  } else if ( line->m_status == MODIFIED ) {
                 idx = index;
                 return HIT;
-            } else {
+		    } else {
                 assert( line->m_status == INVALID );
             }
         }
@@ -204,11 +202,6 @@ enum cache_request_status tag_array::probe( new_addr_type addr, unsigned &idx ) 
                         valid_line = index;
                     }
                 }
-				//*****David-4/21*******************************************/
-				//add condition for SRRIP miss
-				//*****David-4/21*******************************************/
-		
-		
             }
         }
     }
@@ -222,10 +215,9 @@ enum cache_request_status tag_array::probe( new_addr_type addr, unsigned &idx ) 
     } else if ( valid_line != (unsigned)-1) {
         idx = valid_line;
     } else abort(); // if an unreserved block exists, it is either invalid or replaceable 
-
+	//	check and add this follwoing to probe. COver all
     return MISS;
 }
-
 enum cache_request_status tag_array::access( new_addr_type addr, unsigned time, unsigned &idx )
 {
     bool wb=false;
@@ -244,27 +236,18 @@ enum cache_request_status tag_array::access( new_addr_type addr, unsigned time, 
     case HIT_RESERVED: 
         m_pending_hit++;
     case HIT: 
-		//*****David-4/21*******************************************/
-		//call CACP HIT function in extended object.
-		//call SRRIP HIT function in extended object.
-        //*****David-4/21*******************************************/
 		
 		m_lines[idx].m_last_access_time=time; 
         break;
     case MISS:
         m_miss++;
-		//*****David-4/21*******************************************/
-		//call CACP Insertion/Fill function in extended object.
-		 //*****David-4/21*******************************************/
-		
+	
 		
         shader_cache_access_log(m_core_id, m_type_id, 1); // log cache misses
         if ( m_config.m_alloc_policy == ON_MISS ) {
             if( m_lines[idx].m_status == MODIFIED ) {
                 wb = true;
 				
-				//*****David-4/21*******************************************/
-				//call CACP eviction function in extended object.
                 evicted = m_lines[idx];
             }
             m_lines[idx].allocate( m_config.tag(addr), m_config.block_addr(addr), time );
@@ -1110,6 +1093,14 @@ data_cache::access( new_addr_type addr,
 /// (the policy used in fermi according to the CUDA manual)
 enum cache_request_status
 l1_cache::access( new_addr_type addr,
+                  mem_fetch *mf,
+                  unsigned time,
+                  std::list<cache_event> &events )
+{
+    return data_cache::access( addr, mf, time, events );
+}
+enum cache_request_status
+l1_cache_cacp::access( new_addr_type addr,
                   mem_fetch *mf,
                   unsigned time,
                   std::list<cache_event> &events )
