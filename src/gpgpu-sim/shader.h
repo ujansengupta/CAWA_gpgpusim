@@ -1391,7 +1391,6 @@ struct shader_core_config : public core_config
     bool tw_actual_cpl_stall; // on = consider stall cycles
     bool tw_gpgpu_load_oracle_counter; // on = load oracle counter
     bool tw_gpgpu_store_oracle_counter; // on = store oracle counter
-    char* tw_gpgpu_oracle_scheduler_string;
     bool dj_gpgpu_with_cacp; // on = use cacp; off = no cacp
     //****************************************/
 
