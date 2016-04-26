@@ -367,24 +367,6 @@ void shader_core_config::reg_options(class OptionParser * opp)
                                 "For complete list of prioritization values see shader.h enum scheduler_prioritization_type"
                                 "Default: gto",
                                  "gto");
-    option_parser_register(opp, "-gpgpu_with_oracle_cpl", OPT_BOOL, &tw_gpgpu_oracle_cpl,
-			   "Use oracle CPL info or not (default=on)",
-			   "1");
-    option_parser_register(opp, "-gpgpu_oracle_counter_from_scheduler", OPT_CSTR, &tw_gpgpu_oracle_scheduler_string,
-			   "oracle counter from which previous scheduler",
-			   "gto");
-    option_parser_register(opp, "-gpgpu_actual_cpl_static_ninst", OPT_BOOL, &tw_actual_cpl_static_ninst,
-			   "use static number of instructions in each warp or not",
-			   "0");
-    option_parser_register(opp, "-gpgpu_actual_cpl_real_cpi", OPT_BOOL, &tw_actual_cpl_real_cpi,
-			   "use calculated average CPI or not",
-			   "0");
-    option_parser_register(opp, "-gpgpu_actual_cpl_stall", OPT_BOOL, &tw_actual_cpl_stall,
-			   "use stalling info or not",
-			   "0");
-    option_parser_register(opp, "-gpgpu_with_cacp", OPT_BOOL, &dj_gpgpu_with_cacp,
-                           "Use CACP or not (default=off)",
-                           "0");
     //********************************************/
 }
 
@@ -394,6 +376,9 @@ void gpgpu_sim_config::reg_options(option_parser_t opp)
     m_shader_config.reg_options(opp);
     m_memory_config.reg_options(opp);
     power_config::reg_options(opp);
+    //************* TW: 04/25/16 **************/
+    m_shader_config.tw_cawa_reg_options(opp);
+    //*****************************************/
    option_parser_register(opp, "-gpgpu_max_cycle", OPT_INT32, &gpu_max_cycle_opt, 
                "terminates gpu simulation early (0 = no limit)",
                "0");

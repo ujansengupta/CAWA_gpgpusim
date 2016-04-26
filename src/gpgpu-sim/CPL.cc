@@ -5,7 +5,7 @@
  ****     ../gpgpusim_entrypoint.cc                   ****
  ****     gpu-sim.cc                                  ****
  ****     shader.cc                                   ****
- ****  04/07/16 04/20/16 04/22/16                     ****
+ ****  04/07/16 04/20/16 04/22/16 04/25/16            ****
  *********************************************************/
 
 #include <float.h>
@@ -23,9 +23,11 @@ void gpgpu_sim::tw_store_oracle_cpl() const
   char cpl_name[50];
   strcpy(cpl_name, m_shader_config->gpgpu_scheduler_string);
   strcat(cpl_name, ".cpl");
-  FILE* fp = fopen(cpl_name, "w");
-  m_shader_stats->tw_store_oracle_cpl(fp);
-  fclose(fp);
+  if (m_shader_config->tw_gpgpu_store_oracle_counter){
+    FILE* fp = fopen(cpl_name, "w");
+    m_shader_stats->tw_store_oracle_cpl(fp);
+    fclose(fp);
+  }
 }
 void gpgpu_sim::tw_load_oracle_cpl()
 {
@@ -33,7 +35,11 @@ void gpgpu_sim::tw_load_oracle_cpl()
   strcpy(cpl_name, m_shader_config->tw_gpgpu_oracle_scheduler_string);
   strcat(cpl_name, ".cpl");
   FILE* fp = fopen(cpl_name, "r");
-  if (fp){// Only load oracle cpl file if exists
+  if (m_shader_config->tw_gpgpu_load_oracle_counter){
+    if (fp == NULL){
+      printf("The oracle counter for scheduler %s not exists\n", m_shader_config->tw_gpgpu_oracle_scheduler_string);
+      assert(0);
+    }
     printf("Load criticality counter from file %s\n", cpl_name);
     m_shader_stats->tw_load_oracle_cpl(fp);
     fclose(fp);
@@ -110,6 +116,27 @@ int shader_core_stats::tw_get_oracle_CPL_counter(unsigned kernel_id, unsigned bl
   return tw_with_oracle_cpl ? tw_cpl_oracle[kernel_id][block_num+1][warp_id_within_block] : 0;
 }
 
+//********************** class shader_core_config ****************/
+void shader_core_config::tw_cawa_reg_options(class OptionParser * opp)
+{
+  option_parser_register(opp, "-gpgpu_with_oracle_cpl", OPT_BOOL, &tw_gpgpu_oracle_cpl,
+			 "Use oracle CPL info or not (default=on)",
+			 "1");
+  option_parser_register(opp, "-gpgpu_load_oracle_counter", OPT_BOOL, &tw_gpgpu_load_oracle_counter,
+			 "Load oracle CPL info or not (default=off)",
+			 "0");
+  option_parser_register(opp, "-gpgpu_store_oracle_counter", OPT_BOOL, &tw_gpgpu_store_oracle_counter,
+			 "Store oracle CPL info or not (default=off)",
+			 "0");
+  option_parser_register(opp, "-gpgpu_oracle_counter_from_scheduler", OPT_CSTR, 
+			 &tw_gpgpu_oracle_scheduler_string,
+			 "oracle counter from which previous scheduler",
+			 "gto");
+  option_parser_register(opp, "-gpgpu_with_cacp", OPT_BOOL, &dj_gpgpu_with_cacp,
+			 "Use CACP or not (default=off)",
+			 "0");
+}
+
 //********************** class shader_core_ctx *******************/
 void shader_core_ctx::tw_get_start_end_warp_id(unsigned* start_warp_id, unsigned* end_warp_id, unsigned cta_num) const{
   unsigned cta_size = m_kernel->threads_per_cta();
@@ -134,6 +161,8 @@ void shader_core_ctx::tw_record_oracle_cpl(unsigned cta_num)
 #endif
   for (unsigned i = start_warp_id; i < end_warp_id; i++){
 #ifdef TW_DEBUG_NEW
+    //if (m_stats->tw_with_oracle_cpl)
+      //tw_oracle_CPL_sanity_check(i, m_stats->tw_warp_cta_cycle_dist[m_sid][i]);
     printf("\t W%d: %d", i, m_stats->tw_warp_cta_cycle_dist[m_sid][i]);
 #endif
     m_stats->tw_cpl_actual[m_kernel->get_uid()-1][tw_cta_num_in_kernel[cta_num]+1][i-start_warp_id] = m_stats->tw_warp_cta_cycle_dist[m_sid][i];
@@ -171,7 +200,7 @@ void shader_core_ctx::tw_oracle_CPL_sanity_check(unsigned warp_id, int actual_co
 bool shader_core_ctx::tw_if_use_oracle_cpl() const
 {
   if (m_config->tw_gpgpu_oracle_cpl){
-    assert(m_stats->tw_with_oracle_cpl);
+    assert (m_stats->tw_with_oracle_cpl);
     return true;
   }
   else
