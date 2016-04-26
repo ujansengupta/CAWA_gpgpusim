@@ -70,7 +70,6 @@ then
         then
             rm $OUT
         fi
-	echo "generating oracle counter for $bench with $SCHED"
         sh README.GPGPU-Sim > $OUT
 	cd ..
     done

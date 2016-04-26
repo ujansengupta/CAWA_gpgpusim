@@ -1325,6 +1325,9 @@ struct shader_core_config : public core_config
         m_valid = true;
     }
     void reg_options(class OptionParser * opp );
+    //************** TW: 04/25/16 **************/
+    void tw_cawa_reg_options(class OptionParser * opp);
+    //******************************************/
     unsigned max_cta( const kernel_info_t &k ) const;
     unsigned num_shader() const { return n_simt_clusters*n_simt_cores_per_cluster; }
     unsigned sid_to_cluster( unsigned sid ) const { return sid / n_simt_cores_per_cluster; }
@@ -1361,6 +1364,7 @@ struct shader_core_config : public core_config
     //************* TW: 04/20/16 *************/
     bool tw_gpgpu_oracle_cpl; // on = generate oracle CPL for 1st run and use the info at 2nd run
     bool tw_gpgpu_load_oracle_counter; // on = load oracle counter
+    bool tw_gpgpu_store_oracle_counter; // on = store oracle counter
     char* tw_gpgpu_oracle_scheduler_string;
     bool dj_gpgpu_with_cacp; // on = use cacp; off = no cacp
     //****************************************/

@@ -5,7 +5,7 @@
  ****     ../gpgpusim_entrypoint.cc                   ****
  ****     gpu-sim.cc                                  ****
  ****     shader.cc                                   ****
- ****  04/07/16 04/20/16                              ****
+ ****  04/07/16 04/20/16 04/22/16 04/25/16            ****
  *********************************************************/
 
 #include <float.h>
@@ -21,9 +21,11 @@ void gpgpu_sim::tw_store_oracle_cpl() const
   char cpl_name[50];
   strcpy(cpl_name, m_shader_config->gpgpu_scheduler_string);
   strcat(cpl_name, ".cpl");
-  FILE* fp = fopen(cpl_name, "w");
-  m_shader_stats->tw_store_oracle_cpl(fp);
-  fclose(fp);
+  if (m_shader_config->tw_gpgpu_store_oracle_counter){
+    FILE* fp = fopen(cpl_name, "w");
+    m_shader_stats->tw_store_oracle_cpl(fp);
+    fclose(fp);
+  }
 }
 void gpgpu_sim::tw_load_oracle_cpl()
 {
@@ -110,6 +112,27 @@ void shader_core_stats::tw_load_oracle_cpl(FILE* fp)
 int shader_core_stats::tw_get_oracle_CPL_counter(unsigned kernel_id, unsigned block_num, unsigned warp_id_within_block) const
 {
   return tw_with_oracle_cpl ? tw_cpl_oracle[kernel_id][block_num+1][warp_id_within_block] : 0;
+}
+
+//********************** class shader_core_config ****************/
+void shader_core_config::tw_cawa_reg_options(class OptionParser * opp)
+{
+  option_parser_register(opp, "-gpgpu_with_oracle_cpl", OPT_BOOL, &tw_gpgpu_oracle_cpl,
+			 "Use oracle CPL info or not (default=on)",
+			 "1");
+  option_parser_register(opp, "-gpgpu_load_oracle_counter", OPT_BOOL, &tw_gpgpu_load_oracle_counter,
+			 "Load oracle CPL info or not (default=off)",
+			 "0");
+  option_parser_register(opp, "-gpgpu_store_oracle_counter", OPT_BOOL, &tw_gpgpu_store_oracle_counter,
+			 "Store oracle CPL info or not (default=off)",
+			 "0");
+  option_parser_register(opp, "-gpgpu_oracle_counter_from_scheduler", OPT_CSTR, 
+			 &tw_gpgpu_oracle_scheduler_string,
+			 "oracle counter from which previous scheduler",
+			 "gto");
+  option_parser_register(opp, "-gpgpu_with_cacp", OPT_BOOL, &dj_gpgpu_with_cacp,
+			 "Use CACP or not (default=off)",
+			 "0");
 }
 
 //********************** class shader_core_ctx *******************/
