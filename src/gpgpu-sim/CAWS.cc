@@ -37,7 +37,7 @@ bool scheduler_unit::sort_warps_by_criticality(shd_warp_t* lhs, shd_warp_t* rhs)
         {
             if (lhs->tw_get_CPL() == rhs->tw_get_CPL())
             {	
-            	return lhs->get_warp_id() < rhs->get_warp_id();
+            	return lhs->get_dynamic_warp_id() < rhs->get_dynamic_warp_id();
             }
             else
             {
