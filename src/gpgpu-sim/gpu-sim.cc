@@ -360,12 +360,14 @@ void shader_core_config::reg_options(class OptionParser * opp)
     option_parser_register(opp, "-gpgpu_num_mem_units", OPT_INT32, &gpgpu_num_mem_units,
                             "Number if ldst units (default=1) WARNING: not hooked up to anything",
                              "1");
+    //*************** TW: 04/22/16 ***************/
     option_parser_register(opp, "-gpgpu_scheduler", OPT_CSTR, &gpgpu_scheduler_string,
-                                "Scheduler configuration: < lrr | gto | two_level_active > "
+                                "Scheduler configuration: < lrr | gto | two_level_active | cawa> "
                                 "If two_level_active:<num_active_warps>:<inner_prioritization>:<outer_prioritization>"
                                 "For complete list of prioritization values see shader.h enum scheduler_prioritization_type"
                                 "Default: gto",
                                  "gto");
+    //********************************************/
 }
 
 void gpgpu_sim_config::reg_options(option_parser_t opp)
@@ -374,6 +376,9 @@ void gpgpu_sim_config::reg_options(option_parser_t opp)
     m_shader_config.reg_options(opp);
     m_memory_config.reg_options(opp);
     power_config::reg_options(opp);
+    //************* TW: 04/25/16 **************/
+    m_shader_config.tw_cawa_reg_options(opp);
+    //*****************************************/
    option_parser_register(opp, "-gpgpu_max_cycle", OPT_INT32, &gpu_max_cycle_opt, 
                "terminates gpu simulation early (0 = no limit)",
                "0");
@@ -1081,15 +1086,6 @@ void shader_core_ctx::issue_block2core( kernel_info_t &kernel )
 
     //*********************** TW: 04/07/16 ************************/
     tw_cta_num_in_kernel[free_cta_hw_id] = kernel.tw_next_cta_num();
-    printf("TW: Kernel %d core %d cta %d (block %d in kernel): \n", kernel.get_uid(), m_sid, free_cta_hw_id, kernel.tw_next_cta_num());
-    unsigned *rank_oracle_cpl = NULL;
-    tw_rank_oracle_cpl(free_cta_hw_id, &rank_oracle_cpl);
-    assert(rank_oracle_cpl != NULL);
-    assert(kernel.threads_per_cta() / m_config->warp_size == m_stats->tw_cpl_oracle[kernel.get_uid()-1][0][1]);
-    for (unsigned i = 0; i < kernel.threads_per_cta() / m_config->warp_size; i++){
-      printf("%d ", rank_oracle_cpl[i]);
-    }
-    printf("\n");
     //*************************************************************/
 
     // reset the microarchitecture state of the selected hardware thread and warp contexts

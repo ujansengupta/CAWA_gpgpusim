@@ -168,19 +168,20 @@ enum cache_request_status tag_array::probe( new_addr_type addr, unsigned &idx ) 
 
     // check for hit or pending hit
     for (unsigned way=0; way<m_config.m_assoc; way++) {
-        unsigned index = set_index*m_config.m_assoc+way;
+		unsigned index = set_index*m_config.m_assoc+way;
         cache_block_t *line = &m_lines[index];
         if (line->m_tag == tag) {
             if ( line->m_status == RESERVED ) {
                 idx = index;
                 return HIT_RESERVED;
+			
             } else if ( line->m_status == VALID ) {
                 idx = index;
                 return HIT;
-            } else if ( line->m_status == MODIFIED ) {
+		  } else if ( line->m_status == MODIFIED ) {
                 idx = index;
                 return HIT;
-            } else {
+		    } else {
                 assert( line->m_status == INVALID );
             }
         }
@@ -214,10 +215,9 @@ enum cache_request_status tag_array::probe( new_addr_type addr, unsigned &idx ) 
     } else if ( valid_line != (unsigned)-1) {
         idx = valid_line;
     } else abort(); // if an unreserved block exists, it is either invalid or replaceable 
-
+	//	check and add this follwoing to probe. COver all
     return MISS;
 }
-
 enum cache_request_status tag_array::access( new_addr_type addr, unsigned time, unsigned &idx )
 {
     bool wb=false;
@@ -236,14 +236,18 @@ enum cache_request_status tag_array::access( new_addr_type addr, unsigned time, 
     case HIT_RESERVED: 
         m_pending_hit++;
     case HIT: 
-        m_lines[idx].m_last_access_time=time; 
+		
+		m_lines[idx].m_last_access_time=time; 
         break;
     case MISS:
         m_miss++;
+	
+		
         shader_cache_access_log(m_core_id, m_type_id, 1); // log cache misses
         if ( m_config.m_alloc_policy == ON_MISS ) {
             if( m_lines[idx].m_status == MODIFIED ) {
                 wb = true;
+				
                 evicted = m_lines[idx];
             }
             m_lines[idx].allocate( m_config.tag(addr), m_config.block_addr(addr), time );
@@ -1095,7 +1099,29 @@ l1_cache::access( new_addr_type addr,
 {
     return data_cache::access( addr, mf, time, events );
 }
-
+//*****David-4/24*******************************************/
+//adding cacp access copy
+enum cache_request_status
+l1_cache_cacp::access( new_addr_type addr,
+                  mem_fetch *mf,
+                  unsigned time,
+                  std::list<cache_event> &events )
+{
+	
+	 assert( mf->get_data_size() <= m_config.get_line_sz());
+    bool wr = mf->get_is_write();
+    new_addr_type block_addr = m_config.block_addr(addr);
+    unsigned cache_index = (unsigned)-1;
+	enum cache_request_status probe_status
+        = m_tag_array->probe( block_addr, cache_index , mf.req_criticality, mf.getpc());
+    enum cache_request_status access_status
+        = process_tag_probe( wr, probe_status, addr, cache_index, mf, time, events );
+    m_stats.inc_stats(mf->get_access_type(),
+        m_stats.select_stats_status(probe_status, access_status));
+    return access_status;
+   // return data_cache::access( addr, mf, time, events );
+}
+//*****David-4/24*******************************************/
 // The l2 cache access function calls the base data_cache access
 // implementation.  When the L2 needs to diverge from L1, L2 specific
 // changes should be made here.

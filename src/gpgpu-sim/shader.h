@@ -1,3 +1,4 @@
+//testing ujan
 // Copyright (c) 2009-2011, Tor M. Aamodt, Wilson W.L. Fung, Andrew Turner,
 // Ali Bakhoda 
 // The University of British Columbia
@@ -85,10 +86,14 @@ public:
    bool m_active; 
 };
 
+class shader_core_ctx;
+class shader_core_config;
+class shader_core_stats;
+
 class shd_warp_t {
 public:
-    shd_warp_t( class shader_core_ctx *shader, unsigned warp_size) 
-        : m_shader(shader), m_warp_size(warp_size)
+ shd_warp_t( class shader_core_ctx *shader, unsigned warp_size) 
+   : m_shader(shader), m_warp_size(warp_size)
     {
         m_stores_outstanding=0;
         m_inst_in_pipeline=0;
@@ -108,12 +113,19 @@ public:
         m_last_fetch=0;
         m_next=0;
         m_inst_at_barrier=NULL;
+	//*********** TW: 04/20/16 *************/
+	tw_cpl_oracle = 0;
+	tw_cpl_actual = 0;
+	//**************************************/
     }
     void init( address_type start_pc,
                unsigned cta_id,
                unsigned wid,
                const std::bitset<MAX_WARP_SIZE> &active,
-               unsigned dynamic_warp_id )
+               unsigned dynamic_warp_id,
+	       //******* TW: 04/20/16 ********/
+	       int oracle_CPL )
+    //******** TW: 04/20/16*************/
     {
         m_cta_id=cta_id;
         m_warp_id=wid;
@@ -121,9 +133,13 @@ public:
         m_next_pc=start_pc;
         assert( n_completed >= active.count() );
         assert( n_completed <= m_warp_size);
-        n_completed   -= active.count(); // active threads are not yet completed
+        n_completed -= active.count(); // active threads are not yet completed
         m_active_threads = active;
         m_done_exit=false;
+	//*********** TW: 04/20/16 *************/
+        tw_cpl_oracle = oracle_CPL;
+        tw_cpl_actual = 0;
+        //**************************************/ 
     }
 
     bool functional_done() const;
@@ -227,6 +243,17 @@ public:
     unsigned get_dynamic_warp_id() const { return m_dynamic_warp_id; }
     unsigned get_warp_id() const { return m_warp_id; }
 
+    //*************** TW: 04/20/16 *****************/
+    void tw_set_oracle_CPL(int cpl) { tw_cpl_oracle = cpl; }
+    int tw_get_oracle_CPL() const { return tw_cpl_oracle; }
+    float tw_get_actual_CPL() const { return tw_cpl_actual; }
+    float tw_get_CPL() const;
+    //**********************************************/
+     //************************************************/
+     //David: 04/21
+     //warp criticality divided by max warp criticality in this shader core, set to a boolean
+	bool criticality;
+   //************************************************/
 private:
     static const unsigned IBUFFER_SIZE=2;
     class shader_core_ctx *m_shader;
@@ -260,6 +287,14 @@ private:
 
     unsigned m_stores_outstanding; // number of store requests sent but not yet acknowledged
     unsigned m_inst_in_pipeline;
+
+    //**************** TW: 04/20/16 ******************/
+    bool tw_with_oracle_cpl;
+    int tw_cpl_oracle;
+    float tw_cpl_actual;
+    //************************************************/
+	
+    
 };
 
 
@@ -272,9 +307,6 @@ typedef std::bitset<WARP_PER_CTA_MAX> warp_set_t;
 
 int register_bank(int regnum, int wid, unsigned num_banks, unsigned bank_warp_shift);
 
-class shader_core_ctx;
-class shader_core_config;
-class shader_core_stats;
 
 enum scheduler_prioritization_type
 {
@@ -285,6 +317,10 @@ enum scheduler_prioritization_type
     SCHEDULER_PRIORITIZATION_GTY, // Greedy Then Youngest
     SCHEDULER_PRIORITIZATION_OLDEST, // Oldest First
     SCHEDULER_PRIORITIZATION_YOUNGEST, // Youngest First
+    
+    //---------US - 4/22-----------//
+    SCHEDULER_PRIORITIZATION_CAWA  //Criticality Aware and GTO
+    //---------US - 4/22-----------//
 };
 
 // Each of these corresponds to a string value in the gpgpsim.config file
@@ -295,11 +331,22 @@ enum concrete_scheduler
     CONCRETE_SCHEDULER_GTO,
     CONCRETE_SCHEDULER_TWO_LEVEL_ACTIVE,
     CONCRETE_SCHEDULER_WARP_LIMITING,
-    NUM_CONCRETE_SCHEDULERS
+    NUM_CONCRETE_SCHEDULERS,
+    //---------US - 4/22-----------//
+    CONCRETE_SCHEDULER_CAWA  //Criticality Aware and GTO
+    //---------US - 4/22-----------//
 };
 
 class scheduler_unit { //this can be copied freely, so can be used in std containers.
 public:
+
+    //--------------US--------------------//
+    
+    int count,flag;
+    scheduler_unit();
+        
+    //--------------US--------------------//
+    
     scheduler_unit(shader_core_stats* stats, shader_core_ctx* shader, 
                    Scoreboard* scoreboard, simt_stack** simt, 
                    std::vector<shd_warp_t>* warp, 
@@ -326,6 +373,7 @@ public:
 
     // These are some common ordering fucntions that the
     // higher order schedulers can take advantage of
+    
     template < typename T >
     void order_lrr( typename std::vector< T >& result_list,
                     const typename std::vector< T >& input_list,
@@ -342,6 +390,7 @@ public:
         ORDERED_PRIORITY_FUNC_ONLY,
         NUM_ORDERING,
     };
+    
     template < typename U >
     void order_by_priority( std::vector< U >& result_list,
                             const typename std::vector< U >& input_list,
@@ -349,7 +398,12 @@ public:
                             unsigned num_warps_to_add,
                             OrderingType age_ordering,
                             bool (*priority_func)(U lhs, U rhs) );
+                            
     static bool sort_warps_by_oldest_dynamic_id(shd_warp_t* lhs, shd_warp_t* rhs);
+    
+    //---------US - 4/22-----------//
+    static bool sort_warps_by_criticality(shd_warp_t* lhs, shd_warp_t* rhs);
+    //---------US - 4/22-----------//
 
     // Derived classes can override this function to populate
     // m_supervised_warps with their scheduling policies
@@ -421,6 +475,29 @@ public:
     }
 
 };
+
+
+//---------US - 4/22-----------//
+
+class cawa_scheduler : public scheduler_unit {
+public:
+	cawa_scheduler ( shader_core_stats* stats, shader_core_ctx* shader,
+                    Scoreboard* scoreboard, simt_stack** simt,
+                    std::vector<shd_warp_t>* warp,
+                    register_set* sp_out,
+                    register_set* sfu_out,
+                    register_set* mem_out,
+                    int id )
+	: scheduler_unit ( stats, shader, scoreboard, simt, warp, sp_out, sfu_out, mem_out, id ){}
+	virtual ~cawa_scheduler () {}
+	virtual void order_warps ();
+    virtual void done_adding_supervised_warps() {
+        m_last_supervised_issued = m_supervised_warps.begin();		//Check whether to keep it as m-sup_warps.begin or end//
+    }
+};
+
+//---------US - 4/22-----------//
+
 
 
 class two_level_active_scheduler : public scheduler_unit {
@@ -1254,6 +1331,9 @@ struct shader_core_config : public core_config
         m_valid = true;
     }
     void reg_options(class OptionParser * opp );
+    //************** TW: 04/25/16 **************/
+    void tw_cawa_reg_options(class OptionParser * opp);
+    //******************************************/
     unsigned max_cta( const kernel_info_t &k ) const;
     unsigned num_shader() const { return n_simt_clusters*n_simt_cores_per_cluster; }
     unsigned sid_to_cluster( unsigned sid ) const { return sid / n_simt_cores_per_cluster; }
@@ -1286,6 +1366,14 @@ struct shader_core_config : public core_config
 
     int gpgpu_num_sched_per_core;
     int gpgpu_max_insn_issue_per_warp;
+
+    //************* TW: 04/20/16 *************/
+    bool tw_gpgpu_oracle_cpl; // on = generate oracle CPL for 1st run and use the info at 2nd run
+    bool tw_gpgpu_load_oracle_counter; // on = load oracle counter
+    bool tw_gpgpu_store_oracle_counter; // on = store oracle counter
+    char* tw_gpgpu_oracle_scheduler_string;
+    bool dj_gpgpu_with_cacp; // on = use cacp; off = no cacp
+    //****************************************/
 
     //op collector
     int gpgpu_operand_collector_num_units_sp;
@@ -1452,9 +1540,9 @@ public:
         m_n_diverge = (unsigned*) calloc(config->num_shader(),sizeof(unsigned));
         shader_cycle_distro = (unsigned*) calloc(config->warp_size+3, sizeof(unsigned));
 	//******************* TW: 04/07/16 *********************/
-	tw_warp_cta_cycle_dist = (unsigned**) calloc(config->num_shader(), sizeof(unsigned*));
+	tw_warp_cta_cycle_dist = (int**) calloc(config->num_shader(), sizeof(int*));
 	for (unsigned i = 0; i < config->num_shader(); i++){
-	  tw_warp_cta_cycle_dist[i] = (unsigned*)calloc(config->max_warps_per_shader, sizeof(unsigned));
+	  tw_warp_cta_cycle_dist[i] = (int*)calloc(config->max_warps_per_shader, sizeof(int));
 	}
 	tw_num_launched_kernels = 0;
 	tw_with_oracle_cpl = false;
@@ -1498,6 +1586,10 @@ public:
     void tw_launch_kernel(unsigned kid, unsigned total_cta, unsigned num_warps_per_cta);
     void tw_store_oracle_cpl(FILE* fp) const;
     void tw_load_oracle_cpl(FILE* fp);
+    bool tw_if_with_oracle_cpl() const{
+      return tw_with_oracle_cpl;
+    }
+    int tw_get_oracle_CPL_counter(unsigned kernel_id, unsigned block_num, unsigned warp_id_within_block) const;
     //******************************************************/
 
     const std::vector< std::vector<unsigned> >& get_dynamic_warp_issue() const
@@ -1523,9 +1615,9 @@ private:
     std::vector<unsigned> m_last_shader_warp_slot_issue_distro;
 
     //***************** TW: 04/08/16 ************/
-    std::vector<unsigned**> tw_cpl_actual;
-    unsigned ***tw_cpl_oracle;
-    unsigned **tw_warp_cta_cycle_dist;
+    std::vector<int**> tw_cpl_actual;
+    int ***tw_cpl_oracle;
+    int **tw_warp_cta_cycle_dist;
     unsigned tw_num_launched_kernels;
     bool tw_with_oracle_cpl;
     //*******************************************/
@@ -1757,6 +1849,9 @@ public:
 	 void inc_simt_to_mem(unsigned n_flits){ m_stats->n_simt_to_mem[m_sid] += n_flits; }
 	 bool check_if_non_released_reduction_barrier(warp_inst_t &inst);
 
+	 //************** TW: 04/22/16 *************/
+	 bool tw_if_use_oracle_cpl() const;
+	 //*****************************************/
  private:
     unsigned inactive_lanes_accesses_sfu(unsigned active_count,double latency){
       return  ( ((32-active_count)>>1)*latency) + ( ((32-active_count)>>3)*latency) + ( ((32-active_count)>>3)*latency);
@@ -1784,8 +1879,11 @@ public:
     //******************* TW: 04/07/16 ****************/
     unsigned tw_cta_num_in_kernel[MAX_CTA_PER_SHADER];
     void tw_get_start_end_warp_id(unsigned* start_warp_id, unsigned* end_warp_id, unsigned cta_num) const;
-    void tw_rank_oracle_cpl( unsigned cta_num, unsigned** ranked_oracle_cpl ) const;
+    void tw_rank_oracle_cpl( unsigned cta_num, int** ranked_oracle_cpl ) const;
     void tw_record_oracle_cpl( unsigned cta_num );
+    std::vector<float> tw_get_current_CPL_counters() const;
+    void tw_print_CPL_counters(unsigned start_id, unsigned end_id) const;
+    void tw_oracle_CPL_sanity_check(unsigned warp_id, int actual_counter) const;
     //*************************************************/
      // Returns numbers of addresses in translated_addrs
     unsigned translate_local_memaddr( address_type localaddr, unsigned tid, unsigned num_shader, unsigned datasize, new_addr_type* translated_addrs );
@@ -1795,7 +1893,14 @@ public:
     void execute();
     
     void writeback();
-    
+ 
+	
+    //************************************************/
+    //David-4/24/2016-Function to calculate per warp criticality, to be called every time tw's counters are refereshed.
+    void calc_warp_criticality();
+	bool get_warp_critical(unsigned warpid);
+    //*****David-4/24*******************************************/
+		
     // used in display_pipeline():
     void dump_warp_state( FILE *fout ) const;
     void print_stage(unsigned int stage, FILE *fout) const;

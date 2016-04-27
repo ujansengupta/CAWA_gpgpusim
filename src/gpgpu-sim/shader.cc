@@ -54,6 +54,7 @@
 
 /////////////////////////////////////////////////////////////////////////////
 
+
 std::list<unsigned> shader_core_ctx::get_regs_written( const inst_t &fvt ) const
 {
    std::list<unsigned> result;
@@ -126,7 +127,13 @@ shader_core_ctx::shader_core_ctx( class gpgpu_sim *gpu,
     //must currently occur after all inputs have been initialized.
     std::string sched_config = m_config->gpgpu_scheduler_string;
     const concrete_scheduler scheduler = sched_config.find("lrr") != std::string::npos ?
-                                         CONCRETE_SCHEDULER_LRR :
+                                         CONCRETE_SCHEDULER_LRR :      
+                                                                     
+                                         //---------US - 4/22-----------//
+                                         sched_config.find("cawa") != std::string::npos ?
+                                         CONCRETE_SCHEDULER_CAWA :
+                                         //---------US - 4/22-----------//
+                                         
                                          sched_config.find("two_level_active") != std::string::npos ?
                                          CONCRETE_SCHEDULER_TWO_LEVEL_ACTIVE :
                                          sched_config.find("gto") != std::string::npos ?
@@ -182,6 +189,25 @@ shader_core_ctx::shader_core_ctx( class gpgpu_sim *gpu,
                                      )
                 );
                 break;
+                
+            //---------US - 4/22-----------//
+            case CONCRETE_SCHEDULER_CAWA:
+                schedulers.push_back(
+                    new cawa_scheduler( m_stats,
+                                       this,
+                                       m_scoreboard,
+                                       m_simt_stack,
+                                       &m_warp,
+                                       &m_pipeline_reg[ID_OC_SP],
+                                       &m_pipeline_reg[ID_OC_SFU],
+                                       &m_pipeline_reg[ID_OC_MEM],
+                                       i
+                                     )
+                );
+                break;
+            //---------US - 4/22-----------//
+            
+            
             case CONCRETE_SCHEDULER_WARP_LIMITING:
                 schedulers.push_back(
                     new swl_scheduler( m_stats,
@@ -336,10 +362,15 @@ void shader_core_ctx::init_warps( unsigned cta_id, unsigned start_thread, unsign
                 }
             }
             m_simt_stack[i]->launch(start_pc,active_threads);
-            m_warp[i].init(start_pc,cta_id,i,active_threads, m_dynamic_warp_id);
+	    //********************* TW: 04/20/16 *****************/	    
+	    //Load previously stored oracle CPL counters
+	    unsigned oracle_CPL = m_stats->tw_get_oracle_CPL_counter(m_kernel->get_uid()-1, tw_cta_num_in_kernel[cta_id], i - start_warp);
+            m_warp[i].init(start_pc,cta_id,i,active_threads, m_dynamic_warp_id, oracle_CPL);
+	    //****************************************************/
             ++m_dynamic_warp_id;
             m_not_completed += n_active;
-      }
+
+	}
    }
 }
 
@@ -803,6 +834,51 @@ void scheduler_unit::order_by_priority( std::vector< T >& result_list,
         fprintf( stderr, "Unknown ordering - %d\n", ordering );
         abort();
     }
+    
+    /*
+    //--------------US - 4/23/2016 --------------------//
+    for (int i=0; i<result_list.size(); i++)
+     {
+        if (result_list[i]->get_dynamic_warp_id() != input_list[i]->get_dynamic_warp_id())// && flag == 0)
+        {
+           flag++;
+           printf("\n The different warp IDs are TEMP DYNAMIC WARP ID: %d , FINAL DYNAMIC WARP ID: %d \n",temp[i]->get_dynamic_warp_id(), result_list[i]->get_dynamic_warp_id());
+           break;
+        }
+     }   
+        
+     if (flag!=0 && count == 0)
+     {
+     	    printf("\n BEFORE ORDERING \n\n");
+     	    
+     	    for (int i=0; i<temp.size(); i++)
+	    {
+	    	if (temp[i]->get_dynamic_warp_id()!= -1)
+	    	{
+	  	    printf("DYNAMIC WARP ID: %d \n",temp[i]->get_dynamic_warp_id());
+	  	    printf("CRITICALITY: %f \n", temp[i]->tw_get_CPL());
+	  	}
+	    }
+     	    
+     	    printf("AFTER ORDERING \n\n");
+    	    
+	    for (int i=0; i<result_list.size(); i++)
+	    {
+	    	if (result_list[i]->get_dynamic_warp_id()!= -1)
+	    	{
+	  	    printf("DYNAMIC WARP ID: %d \n",result_list[i]->get_dynamic_warp_id());
+	  	    printf("CRITICALITY: %f \n", result_list[i]->tw_get_CPL());
+	    	}
+	    }
+
+     
+     	    count++;
+     }
+    
+    //--------------US - 4/23/2016 --------------------//
+    
+    */
+    
 }
 
 void scheduler_unit::cycle()
@@ -1275,6 +1351,7 @@ void shader_core_ctx::writeback()
     }
 }
 
+		 
 bool ldst_unit::shared_cycle( warp_inst_t &inst, mem_stage_stall_type &rc_fail, mem_stage_access_type &fail_type)
 {
    if( inst.space.get_type() != shared_space )
@@ -1342,6 +1419,7 @@ mem_stage_stall_type ldst_unit::process_memory_access_queue( cache_t *cache, war
 
     //const mem_access_t &access = inst.accessq_back();
     mem_fetch *mf = m_mf_allocator->alloc(inst,inst.accessq_back());
+	mf.req_criticality=m_core.get_warp_critical(mf.get_wid());
     std::list<cache_event> events;
     enum cache_request_status status = cache->access(mf->get_addr(),mf,gpu_sim_cycle+gpu_tot_sim_cycle,events);
     return process_cache_access( cache, mf->get_addr(), inst, events, mf, status );
@@ -1619,6 +1697,18 @@ ldst_unit::ldst_unit( mem_fetch_interface *icnt,
     if( !m_config->m_L1D_config.disabled() ) {
         char L1D_name[STRSIZE];
         snprintf(L1D_name, STRSIZE, "L1D_%03d", m_sid);
+		//*****David-4/22*******************************************/
+		//Checking if CACP enabled
+		if(m_config->dj_gpgpu_with_cacp)
+		 m_L1D = (l1_cache*)new l1_cache_cacp( L1D_name,
+                              m_config->m_L1D_config,
+                              m_sid,
+                              get_shader_normal_cache_id(),
+                              m_icnt,
+                              m_mf_allocator,
+                              IN_L1D_MISS_QUEUE );
+		else
+			//*****David-4/22*******************************************/
         m_L1D = new l1_cache( L1D_name,
                               m_config->m_L1D_config,
                               m_sid,
