@@ -6,6 +6,7 @@
  ****     gpu-sim.cc                                  ****
  ****     shader.cc                                   ****
  ****  04/07/16 04/20/16 04/22/16 04/25/16            ****
+ ****  04/26/16                                       ****
  *********************************************************/
 
 #include <float.h>
@@ -14,8 +15,8 @@
 #include "shader.h"
 #include <string.h>
 #include <algorithm>
-#define TW_DEBUG
-#define TW_DEBUG_NEW
+//#define TW_DEBUG
+//#define TW_DEBUG_NEW
 
 //***************** class gpgpu_sim *********************/
 void gpgpu_sim::tw_store_oracle_cpl() const
@@ -45,7 +46,12 @@ void gpgpu_sim::tw_load_oracle_cpl()
     fclose(fp);
   }
 }
-
+void gpgpu_sim::tw_print_cpl_accuracy() const
+{
+  if (m_shader_config->tw_calculate_cpl_accuracy){
+    m_shader_stats->tw_print_cpl_accuracy(stdout);
+  }
+}
 //****************** class shader_core_stats *****************/
 void shader_core_stats::tw_launch_kernel(unsigned kid, unsigned total_cta, unsigned num_warps_per_cta)
 {
@@ -115,7 +121,12 @@ int shader_core_stats::tw_get_oracle_CPL_counter(unsigned kernel_id, unsigned bl
 {
   return tw_with_oracle_cpl ? tw_cpl_oracle[kernel_id][block_num+1][warp_id_within_block] : 0;
 }
-
+void shader_core_stats::tw_print_cpl_accuracy(FILE* fp) const
+{
+  fprintf(fp, "TW: number of total cpl samples = %d\n", tw_total_cpl_for_accuracy);
+  fprintf(fp, "TW: number of accurace cpl samples = %d\n", tw_accurate_cpl_for_accuracy);
+  fprintf(fp, "TW: cpl accuracy = %.2f%%\n", 100.0*tw_accurate_cpl_for_accuracy / tw_total_cpl_for_accuracy);
+}
 //********************** class shader_core_config ****************/
 void shader_core_config::tw_cawa_reg_options(class OptionParser * opp)
 {
@@ -128,10 +139,21 @@ void shader_core_config::tw_cawa_reg_options(class OptionParser * opp)
   option_parser_register(opp, "-gpgpu_store_oracle_counter", OPT_BOOL, &tw_gpgpu_store_oracle_counter,
 			 "Store oracle CPL info or not (default=off)",
 			 "0");
-  option_parser_register(opp, "-gpgpu_oracle_counter_from_scheduler", OPT_CSTR, 
-			 &tw_gpgpu_oracle_scheduler_string,
+  option_parser_register(opp, "-gpgpu_oracle_counter_from_scheduler", OPT_CSTR, &tw_gpgpu_oracle_scheduler_string,
 			 "oracle counter from which previous scheduler",
 			 "gto");
+  option_parser_register(opp, "-caws_actual_cpl_static_ninst", OPT_BOOL, &tw_actual_cpl_static_ninst,
+			 "in caws, use static instruction count as initial counter for actual counter or not",
+			 "0");
+  option_parser_register(opp, "-caws_actual_cpl_real_cpi", OPT_BOOL, &tw_actual_cpl_real_cpi,
+			 "in caws, use calculated average CPI per warp for actual counter or not",
+			 "0");
+  option_parser_register(opp, "-caws_actual_cpl_stall", OPT_BOOL, &tw_actual_cpl_stall,
+			 "in caws, use stall cycles in actual counter or not",
+			 "0");
+  option_parser_register(opp, "-caws_calculate_cpl_accuracy", OPT_BOOL, &tw_calculate_cpl_accuracy,
+			 "calculate CPL accuracy of the actual counter with the oracle counter or not",
+			 "1");
   option_parser_register(opp, "-gpgpu_with_cacp", OPT_BOOL, &dj_gpgpu_with_cacp,
 			 "Use CACP or not (default=off)",
 			 "0");
@@ -161,8 +183,6 @@ void shader_core_ctx::tw_record_oracle_cpl(unsigned cta_num)
 #endif
   for (unsigned i = start_warp_id; i < end_warp_id; i++){
 #ifdef TW_DEBUG_NEW
-    //if (m_stats->tw_with_oracle_cpl)
-      //tw_oracle_CPL_sanity_check(i, m_stats->tw_warp_cta_cycle_dist[m_sid][i]);
     printf("\t W%d: %d", i, m_stats->tw_warp_cta_cycle_dist[m_sid][i]);
 #endif
     m_stats->tw_cpl_actual[m_kernel->get_uid()-1][tw_cta_num_in_kernel[cta_num]+1][i-start_warp_id] = m_stats->tw_warp_cta_cycle_dist[m_sid][i];
@@ -198,8 +218,8 @@ void shader_core_ctx::tw_oracle_CPL_sanity_check(unsigned warp_id, int actual_co
 }
 
 bool shader_core_ctx::tw_if_use_oracle_cpl() const
-{
-  if (m_config->tw_gpgpu_oracle_cpl){
+{  
+  if (m_config->tw_gpgpu_oracle_cpl == true){
     assert (m_stats->tw_with_oracle_cpl);
     return true;
   }
@@ -207,6 +227,42 @@ bool shader_core_ctx::tw_if_use_oracle_cpl() const
     return false;
 }
 
+void shader_core_ctx::tw_calculate_cpl_accuracy() const
+{
+  //  assert(m_stats->tw_with_oracle_cpl);
+  if (m_kernel == NULL)
+    return;
+  for (unsigned i = 0; i < kernel_max_cta_per_shader; i++){
+    //Find critical warp of the thread block
+    unsigned start_warp_id, end_warp_id;
+    tw_get_start_end_warp_id(&start_warp_id, &end_warp_id, i);
+    unsigned crit_warp = start_warp_id;
+    for (unsigned j = start_warp_id; j < end_warp_id; j++){
+      if (m_warp[j].tw_get_oracle_CPL() > m_warp[crit_warp].tw_get_oracle_CPL()){
+	crit_warp = j;
+      }
+    }
+    //Check if its actual counter is larger than 50% of the other warps
+    unsigned num_larger = 0;
+    for (unsigned j = start_warp_id; j < end_warp_id; j++){
+      if (m_warp[j].tw_get_CPL() >= m_warp[crit_warp].tw_get_CPL()){
+	num_larger++;
+      }
+    }
+    if (num_larger >= (end_warp_id-start_warp_id) / 2){
+      m_stats->tw_accurate_cpl_for_accuracy++;
+    }
+#ifdef TW_DEBUG_NEW
+    else{
+      for (unsigned j = start_warp_id; j < end_warp_id; j++){
+	printf("TW:[W%d] Oracle: %d Actual: %f\n", j, m_warp[j].tw_get_oracle_CPL(), m_warp[j].tw_get_CPL());
+      }
+      //      assert(0);
+    }
+#endif
+    m_stats->tw_total_cpl_for_accuracy++;
+  }
+}
 void shader_core_ctx::tw_calculate_cpl(unsigned cycle)
 {
   assert(!m_config->tw_gpgpu_oracle_cpl);
@@ -218,6 +274,9 @@ void shader_core_ctx::tw_calculate_cpl(unsigned cycle)
 #ifdef TW_DEBUG_NEW
     printf("W%d %.2f, ", i, m_warp[i].tw_get_CPL());
 #endif
+  }
+  if (m_config->tw_calculate_cpl_accuracy){
+    tw_calculate_cpl_accuracy();
   }
 #ifdef TW_DEBUG_NEW
   printf("\n");
@@ -247,22 +306,6 @@ static unsigned tw_find_next_pc(unsigned cur_pc, addr_vector_t vec)
     if (vec[i] > max)
       max = vec[i];
   }
-  /*
-  for (unsigned i = 0; i < vec.size(); i++){
-    if (vec[i] != min && vec[i] != max && vec[i] != cur_pc + 8){
-      printf("%d %d %d %d %d: ", i, vec[i], min, max, cur_pc);
-      for (unsigned j = 0; j < vec.size(); j++){
-	printf("%d %d, ", j, vec[j]);
-      }
-      printf("\n");
-    }
-    assert(vec[i] == min || vec[i] == max || vec[i] == cur_pc + 8);
-  }
-  if (min == cur_pc || max == cur_pc){
-    printf("%d %d %d\n", min, max, cur_pc);
-  }
-  assert(min != cur_pc && max != cur_pc);
-  */
   if (min < cur_pc && max > cur_pc){
     min = max;
     for (unsigned i = 0; i < vec.size(); i++){
@@ -291,6 +334,7 @@ address_type shader_core_ctx::tw_calculate_npc_per_warp(unsigned warp_id)
 //***************** class shd_warp_t **************/
 float shd_warp_t::tw_get_CPL() const
 {
+  assert(m_shader);
   return m_shader->tw_if_use_oracle_cpl() ? 1.0*tw_cpl_oracle : tw_cpl_actual;
 }
 void shd_warp_t::tw_warp_enter(unsigned cycle, unsigned ninst)

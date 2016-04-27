@@ -481,7 +481,6 @@ void gpgpu_sim::launch( kernel_info_t *kinfo )
    }
    assert(n < m_running_kernels.size());
    //********************* TW: 04/08/16 ******************/
-   printf("Kernel %d is launched\n", kinfo->get_uid());
    m_shader_stats->tw_launch_kernel(kinfo->get_uid(), kinfo->num_blocks(), kinfo->threads_per_cta() / m_shader_config->warp_size);  // Initialize the critical_warp_info array
    //*****************************************************/
 }

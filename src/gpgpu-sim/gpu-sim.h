@@ -423,6 +423,8 @@ public:
     //********************** TW: 04/08/16 *******************/
     void tw_store_oracle_cpl() const;
     void tw_load_oracle_cpl();
+    //********************** TW: 04/26/16 *******************/
+    void tw_print_cpl_accuracy() const;
     //*******************************************************/
 
 private:

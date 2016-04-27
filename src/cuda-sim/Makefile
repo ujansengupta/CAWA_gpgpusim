@@ -42,9 +42,9 @@ include ../../version_detection.mk
 
 OUTPUT_DIR=$(SIM_OBJ_FILES_DIR)/cuda-sim
 
-OPT	:=  -O3 -g3 -Wall -Wno-unused-function -Wno-sign-compare
+OPT	:=  -O3 -g -Wall -Wno-unused-function -Wno-sign-compare
 ifeq ($(DEBUG),1)
-	OPT := -g3 -Wall  -Wno-unused-function -Wno-sign-compare
+	OPT := -g -Wall  -Wno-unused-function -Wno-sign-compare
 endif
 OPT += -I$(CUDA_INSTALL_PATH)/include  -I$(OUTPUT_DIR)/ -I.
 OPT += -fPIC 

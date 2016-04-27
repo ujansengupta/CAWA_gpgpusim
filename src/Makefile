@@ -51,7 +51,7 @@ else
 	CXXFLAGS += 
 endif
 
-OPTFLAGS += -g3 -fPIC
+OPTFLAGS += -g -fPIC
 
 CPP = g++ $(SNOW)
 OEXT = o
@@ -65,7 +65,7 @@ $(OUTPUT_DIR)/libgpgpusim.a:	$(OBJS) gpu_uarch_simlib
 
 gpu_uarch_simlib:
 	make   -C ./gpgpu-sim
-	
+
 $(OUTPUT_DIR)/Makefile.makedepend: depend
 
 depend:

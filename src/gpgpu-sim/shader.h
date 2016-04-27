@@ -1,4 +1,3 @@
-//testing ujan
 // Copyright (c) 2009-2011, Tor M. Aamodt, Wilson W.L. Fung, Andrew Turner,
 // Ali Bakhoda 
 // The University of British Columbia
@@ -416,11 +415,11 @@ public:
                             bool (*priority_func)(U lhs, U rhs) );
                             
     static bool sort_warps_by_oldest_dynamic_id(shd_warp_t* lhs, shd_warp_t* rhs);
-    
+
     //---------US - 4/22-----------//
     static bool sort_warps_by_criticality(shd_warp_t* lhs, shd_warp_t* rhs);
     //---------US - 4/22-----------//
-
+    
     // Derived classes can override this function to populate
     // m_supervised_warps with their scheduling policies
     virtual void order_warps() = 0;
@@ -430,6 +429,7 @@ protected:
                                     unsigned num_issued,
                                     const std::vector< shd_warp_t* >::const_iterator& prioritized_iter );
     inline int get_sid() const;
+
 protected:
     shd_warp_t& warp(int i);
 
@@ -1383,7 +1383,7 @@ struct shader_core_config : public core_config
     int gpgpu_num_sched_per_core;
     int gpgpu_max_insn_issue_per_warp;
 
-    //************* TW: 04/20/16 *************/
+    //************* TW: 04/26/16 *************/
     bool tw_gpgpu_oracle_cpl; // on = generate oracle CPL for 1st run and use the info at 2nd run
     char* tw_gpgpu_oracle_scheduler_string; // oracle CPL should be get from which previous scheduler info
     bool tw_actual_cpl_static_ninst; // on = use static number of inst, off = use zero
@@ -1391,6 +1391,7 @@ struct shader_core_config : public core_config
     bool tw_actual_cpl_stall; // on = consider stall cycles
     bool tw_gpgpu_load_oracle_counter; // on = load oracle counter
     bool tw_gpgpu_store_oracle_counter; // on = store oracle counter
+    bool tw_calculate_cpl_accuracy;  // on = calculate cpl accuracy for the actual counter
     bool dj_gpgpu_with_cacp; // on = use cacp; off = no cacp
     //****************************************/
 
@@ -1565,6 +1566,9 @@ public:
 	}
 	tw_num_launched_kernels = 0;
 	tw_with_oracle_cpl = false;
+	//******************* TW: 04/26/16 ********************/
+	tw_accurate_cpl_for_accuracy = 0;
+	tw_total_cpl_for_accuracy = 0;
 	//*****************************************************/
         last_shader_cycle_distro = (unsigned*) calloc(m_config->warp_size+3, sizeof(unsigned));
 
@@ -1609,6 +1613,8 @@ public:
       return tw_with_oracle_cpl;
     }
     int tw_get_oracle_CPL_counter(unsigned kernel_id, unsigned block_num, unsigned warp_id_within_block) const;
+    //********************* TW: 04/26/16 *******************/
+    void tw_print_cpl_accuracy(FILE* fp) const;
     //******************************************************/
 
     const std::vector< std::vector<unsigned> >& get_dynamic_warp_issue() const
@@ -1639,6 +1645,9 @@ private:
     int **tw_warp_cta_cycle_dist;
     unsigned tw_num_launched_kernels;
     bool tw_with_oracle_cpl;
+    // **************** TW: 04/26/16 ************/
+    unsigned tw_total_cpl_for_accuracy;
+    unsigned tw_accurate_cpl_for_accuracy;
     //*******************************************/
     friend class power_stat_t;
     friend class shader_core_ctx;
@@ -1907,6 +1916,8 @@ public:
     void tw_calculate_cpl(unsigned cycle);
     unsigned tw_get_static_ninst(unsigned warp_id);
     address_type tw_calculate_npc_per_warp(unsigned warp_id);
+    //******************* TW: 04/26/16 ****************/
+    void tw_calculate_cpl_accuracy() const;
     //*************************************************/
      // Returns numbers of addresses in translated_addrs
     unsigned translate_local_memaddr( address_type localaddr, unsigned tid, unsigned num_shader, unsigned datasize, new_addr_type* translated_addrs );
