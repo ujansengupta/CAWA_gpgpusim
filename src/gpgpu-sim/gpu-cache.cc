@@ -1107,7 +1107,19 @@ l1_cache_cacp::access( new_addr_type addr,
                   unsigned time,
                   std::list<cache_event> &events )
 {
-    return data_cache::access( addr, mf, time, events );
+	
+	 assert( mf->get_data_size() <= m_config.get_line_sz());
+    bool wr = mf->get_is_write();
+    new_addr_type block_addr = m_config.block_addr(addr);
+    unsigned cache_index = (unsigned)-1;
+	enum cache_request_status probe_status
+        = m_tag_array->probe( block_addr, cache_index , mf.req_criticality, mf.getpc());
+    enum cache_request_status access_status
+        = process_tag_probe( wr, probe_status, addr, cache_index, mf, time, events );
+    m_stats.inc_stats(mf->get_access_type(),
+        m_stats.select_stats_status(probe_status, access_status));
+    return access_status;
+   // return data_cache::access( addr, mf, time, events );
 }
 //*****David-4/24*******************************************/
 // The l2 cache access function calls the base data_cache access

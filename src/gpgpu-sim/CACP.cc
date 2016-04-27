@@ -5,7 +5,8 @@
  ****     gpu-cache.cc                                ****
  ****     shader.cc                                   ****
  ****     gpu-cache.h                                 ****
- ****     shader.h 				      				  ****
+ ****     shader.h									  **** 	
+ ****     mem_fetch.h								  **** 	
  ****  04/07/16                                       ****
  *********************************************************/
 #include "shader.h"
@@ -33,9 +34,9 @@
  
 //***************** class tag_array_CACP *********************/
 
-enum cache_request_status tag_array_CACP::probe( new_addr_type addr, unsigned &idx, bool critical )  {
+enum cache_request_status tag_array_CACP::probe( new_addr_type addr, unsigned &idx, bool critical, unsigned pc )  {
     //assert( m_config.m_write_policy == READ_ONLY );
-   unsigned signature;
+    unsigned signature=(addr & 255)^(pc & 255);
 	//unsigned signature=last 8 bits of PC and request addrees. Needs PC address sent here.
 	//change index assingment based on predicted criticality
     unsigned set_index = m_config.set_index(addr);

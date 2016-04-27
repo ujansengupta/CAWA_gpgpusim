@@ -121,7 +121,12 @@ private:
    // where is this request now?
    enum mem_fetch_status m_status;
    unsigned long long m_status_change;
-
+   //*****David-4/24*******************************************/
+   //adding criticality to mem_fetch;
+   bool req_criticality;
+   
+   //*****David-4/24*******************************************/
+   
    // request type, address, size, mask
    mem_access_t m_access;
    unsigned m_data_size; // how much data is being written
