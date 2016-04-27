@@ -127,7 +127,13 @@ shader_core_ctx::shader_core_ctx( class gpgpu_sim *gpu,
     //must currently occur after all inputs have been initialized.
     std::string sched_config = m_config->gpgpu_scheduler_string;
     const concrete_scheduler scheduler = sched_config.find("lrr") != std::string::npos ?
-                                         CONCRETE_SCHEDULER_LRR :
+                                         CONCRETE_SCHEDULER_LRR :      
+                                                                     
+                                         //---------US - 4/22-----------//
+                                         sched_config.find("cawa") != std::string::npos ?
+                                         CONCRETE_SCHEDULER_CAWA :
+                                         //---------US - 4/22-----------//
+                                         
                                          sched_config.find("two_level_active") != std::string::npos ?
                                          CONCRETE_SCHEDULER_TWO_LEVEL_ACTIVE :
                                          sched_config.find("gto") != std::string::npos ?
@@ -183,6 +189,25 @@ shader_core_ctx::shader_core_ctx( class gpgpu_sim *gpu,
                                      )
                 );
                 break;
+                
+            //---------US - 4/22-----------//
+            case CONCRETE_SCHEDULER_CAWA:
+                schedulers.push_back(
+                    new cawa_scheduler( m_stats,
+                                       this,
+                                       m_scoreboard,
+                                       m_simt_stack,
+                                       &m_warp,
+                                       &m_pipeline_reg[ID_OC_SP],
+                                       &m_pipeline_reg[ID_OC_SFU],
+                                       &m_pipeline_reg[ID_OC_MEM],
+                                       i
+                                     )
+                );
+                break;
+            //---------US - 4/22-----------//
+            
+            
             case CONCRETE_SCHEDULER_WARP_LIMITING:
                 schedulers.push_back(
                     new swl_scheduler( m_stats,
@@ -809,6 +834,51 @@ void scheduler_unit::order_by_priority( std::vector< T >& result_list,
         fprintf( stderr, "Unknown ordering - %d\n", ordering );
         abort();
     }
+    
+    /*
+    //--------------US - 4/23/2016 --------------------//
+    for (int i=0; i<result_list.size(); i++)
+     {
+        if (result_list[i]->get_dynamic_warp_id() != input_list[i]->get_dynamic_warp_id())// && flag == 0)
+        {
+           flag++;
+           printf("\n The different warp IDs are TEMP DYNAMIC WARP ID: %d , FINAL DYNAMIC WARP ID: %d \n",temp[i]->get_dynamic_warp_id(), result_list[i]->get_dynamic_warp_id());
+           break;
+        }
+     }   
+        
+     if (flag!=0 && count == 0)
+     {
+     	    printf("\n BEFORE ORDERING \n\n");
+     	    
+     	    for (int i=0; i<temp.size(); i++)
+	    {
+	    	if (temp[i]->get_dynamic_warp_id()!= -1)
+	    	{
+	  	    printf("DYNAMIC WARP ID: %d \n",temp[i]->get_dynamic_warp_id());
+	  	    printf("CRITICALITY: %f \n", temp[i]->tw_get_CPL());
+	  	}
+	    }
+     	    
+     	    printf("AFTER ORDERING \n\n");
+    	    
+	    for (int i=0; i<result_list.size(); i++)
+	    {
+	    	if (result_list[i]->get_dynamic_warp_id()!= -1)
+	    	{
+	  	    printf("DYNAMIC WARP ID: %d \n",result_list[i]->get_dynamic_warp_id());
+	  	    printf("CRITICALITY: %f \n", result_list[i]->tw_get_CPL());
+	    	}
+	    }
+
+     
+     	    count++;
+     }
+    
+    //--------------US - 4/23/2016 --------------------//
+    
+    */
+    
 }
 
 void scheduler_unit::cycle()
