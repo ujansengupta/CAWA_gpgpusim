@@ -1845,9 +1845,10 @@ public:
  
 	
     //************************************************/
-    //David-4/21/2016-Function to calculate per warp criticality, to be called every time tw's counters are refereshed.
+    //David-4/24/2016-Function to calculate per warp criticality, to be called every time tw's counters are refereshed.
     void calc_warp_criticality();
-    //*****David-4/21*******************************************/
+	bool get_warp_critical(unsigned warpid);
+    //*****David-4/24*******************************************/
 		
     // used in display_pipeline():
     void dump_warp_state( FILE *fout ) const;

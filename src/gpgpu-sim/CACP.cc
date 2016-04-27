@@ -13,23 +13,29 @@
 //***************** class shader_core_ctx *********************/
  void shader_core_ctx:: calc_warp_criticality()
  {
-	 int max=0;
-	 //need to add check for first run.
-	 for (long index=0; index<(long)m_warp.size(); ++index) 
+	int max=0;
+	//need to add check for first run.
+	for (long index=0; index<(long)m_warp.size(); ++index) 
 		if(max<m_warp.at(index).tw_get_CPL())
 			max=m_warp.at(index).tw_get_CPL();
-	 for (long index=0; index<(long)m_warp.size(); ++index) 
+	for (long index=0; index<(long)m_warp.size(); ++index) 
 		if(m_warp.at(index).tw_get_CPL()/max>0.75)
 				m_warp.at(index).criticality=1;
 	 
 	 
  }
+ 
+ bool shader_core_ctx::get_warp_critical(unsigned warpid){
+	 calc_warp_criticality();
+	 return m_warp.at(warpid).criticality;
+ }
 
+ 
+//***************** class tag_array_CACP *********************/
 
 enum cache_request_status tag_array_CACP::probe( new_addr_type addr, unsigned &idx, bool critical )  {
     //assert( m_config.m_write_policy == READ_ONLY );
-    //*****David-4/21*******************************************/
-	unsigned signature;
+   unsigned signature;
 	//unsigned signature=last 8 bits of PC and request addrees. Needs PC address sent here.
 	//change index assingment based on predicted criticality
     unsigned set_index = m_config.set_index(addr);
@@ -41,13 +47,10 @@ enum cache_request_status tag_array_CACP::probe( new_addr_type addr, unsigned &i
 		if(set_index<(m_config.m_nset)/2)
 			set_index+=(m_config.m_nset)/2; 
 	}
-	//*****David-4/21*******************************************/
 	new_addr_type tag = m_config.tag(addr);
-
     unsigned invalid_line = (unsigned)-1;
     unsigned valid_line = (unsigned)-1;
     unsigned valid_timestamp = (unsigned)-1;
-	
     bool all_reserved = true;
     unsigned way;
     // check for hit or pending hit
@@ -59,29 +62,23 @@ enum cache_request_status tag_array_CACP::probe( new_addr_type addr, unsigned &i
             if ( line->m_status == RESERVED ) {
                 idx = index;	
                
-				//*****David-4/21*******************************************/
 				//call CACP HIT function in extended object.
 				cacp_hit(critical,idx);
 				//call SRRIP HIT function
 				SHiP[line->sig]=0;
-				//*****David-4/21*******************************************/
-				 return HIT_RESERVED;
+				return HIT_RESERVED;
 		
             } else if ( line->m_status == VALID ) {
                 idx = index;
                 
-				//*****David-4/21*******************************************/
 				//cacp_hit(critical,idx);
 				SHiP[line->sig]=0;
-				//*****David-4/21*******************************************/
 				return HIT;
             } else if ( line->m_status == MODIFIED ) {
                 idx = index;
                 
-				//*****David-4/21*******************************************/
 				cacp_hit(critical,idx);
 				SHiP[line->sig]=0;
-				//*****David-4/21*******************************************/
 				return HIT;
             } else {
                 assert( line->m_status == INVALID );
@@ -109,7 +106,6 @@ enum cache_request_status tag_array_CACP::probe( new_addr_type addr, unsigned &i
                     }
                 }
 			*/	
-			//*****David-4/24*******************************************/
 			//Modelling SRRIP Miss- David 4/24.
 			if(SHiP[line->sig]==3)
 			{
@@ -145,12 +141,10 @@ enum cache_request_status tag_array_CACP::probe( new_addr_type addr, unsigned &i
     } else abort(); // if an unreserved block exists, it is either invalid or replaceable 
 	
 	//call CACP eviction function in extended object.
-	//*****David-4/24*******************************************/
 	 if( m_lines[idx].m_status == MODIFIED )
 		 cacp_eviction(idx, set_index);
 		 
 	 
-		//*****David-4/24*******************************************/ 
     return MISS;
 }
 void tag_array_CACP::cacp_hit(bool critical, unsigned &idx){
