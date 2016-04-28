@@ -8,7 +8,7 @@ generate()
     for bench in ${bench_pool[@]};
     do
         cd $bench
-        OUT=results.$2.gen.txt
+        OUT=results.$2.txt
         if [ -f $OUT ]
         then
             rm $OUT
@@ -18,7 +18,7 @@ generate()
             echo "generating oracle counter for $bench with $SCHED"
             sh README.GPGPU-Sim > $OUT
 	fi
-	cp $SCHED.cpl ../../gpgpusim/oracleCPLs/$bench.$SCHED.cpl${3}
+	cp $SCHED.cpl ../../gpgpusim/oracleCPLs/$bench.$SCHED.cpl
         cd ..
     done
 }

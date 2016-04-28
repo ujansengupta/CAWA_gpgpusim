@@ -6,7 +6,7 @@ def find_pattern(contents, pattern):
     return sum(cycles)
 
 import sys
-for i in range(len(sys.argv)-1):
+for i in range(sys.argc):
     f=open(sys.argv[i+1])
     contents=f.read()
     f.close()

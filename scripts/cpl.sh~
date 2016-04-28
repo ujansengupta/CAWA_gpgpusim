@@ -9,13 +9,13 @@ load_cpl(){
     bench_pool=$1
     for bench in ${bench_pool[@]};
     do
-	if [ -f gpgpusim/oracleCPLs/${bench}.${2}.cpl${3} ]
+	if [ -f gpgpusim/oracleCPLs/${bench}.${2}.cpl ]
 	then
 	    if [ -f ispass2009-benchmarks/${bench}/${2}.cpl ]
 	    then
 		rm ispass2009-benchmarks/${bench}/${2}.cpl
 	    fi
-	    cp gpgpusim/oracleCPLs/${bench}.${2}.cpl${3} ispass2009-benchmarks/${bench}/${2}.cpl
+	    cp gpgpusim/oracleCPLs/${bench}.${2}.cpl ispass2009-benchmarks/${bench}/${2}.cpl
 	fi
     done
 }
@@ -28,10 +28,10 @@ store_cpl(){
     bench_pool=$1
     for bench in ${bench_pool[@]};
     do
-    if [ -f gpgpusim/oracleCPLs/${bench}.${2}.cpl${3} ]
+    if [ -f ${1}/oracleCPLs/${bench}.${2}.cpl ]
         then
-            rm gpgpusim/oracleCPLs/${bench}.${2}.cpl${3}
+            rm ${1}/oracleCPLs/${bench}.${2}.cpl
         fi
-        cp ispass2009-benchmarks/${bench}/${2}.cpl gpgpusim/oracleCPLs/${bench}.${2}.cpl${3}
+        cp ispass2009-benchmarks/${bench}/${2}.cpl gpgpusim/oracleCPLs/${bench}.${2}.cpl
     done
 }

@@ -15,7 +15,6 @@ config()
 	printf "\n-gpgpu_load_oracle_counter 1" >> gpgpusim.config
     else
 	printf "\n-gpgpu_store_oracle_counter 1" >> gpgpusim.config
-	printf "\n-caws_calculate_cpl_accuracy 0" >> gpgpusim.config
     fi
     if [ "$4" = "yes" ]
     then

@@ -15,7 +15,7 @@ run_bench()
 	    then
 		OUT=results.$4.actual.{$6$7}.txt
 	    else
-		OUT=results.$4.oracle.txt
+		OUT=results.$4.oracle.{$6$7}.txt
 	    fi
             if [ -f $OUT ]
             then
