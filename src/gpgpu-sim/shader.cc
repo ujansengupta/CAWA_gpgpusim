@@ -643,6 +643,9 @@ void shader_core_ctx::fetch()
                     unsigned tid=warp_id*m_config->warp_size+t;
                     if( m_threadState[tid].m_active == true ) {
                         m_threadState[tid].m_active = false; 
+			//************ TW: 04/28/16 ***********/
+			m_warp[warp_id].tw_warp_exit(gpu_tot_sim_cycle+gpu_sim_cycle);
+			//*************************************/
                         unsigned cta_id = m_warp[warp_id].get_cta_id();
                         register_cta_thread_exit(cta_id);
                         m_not_completed -= 1;
@@ -651,8 +654,9 @@ void shader_core_ctx::fetch()
                         did_exit=true;
                     }
                 }
-                if( did_exit ) 
+                if( did_exit ){ 
                     m_warp[warp_id].set_done_exit();
+		}
             }
 
             // this code fetches instructions from the i-cache or generates memory requests
@@ -828,7 +832,6 @@ void scheduler_unit::order_by_priority( std::vector< T >& result_list,
     if ( ORDERING_GREEDY_THEN_PRIORITY_FUNC == ordering ) {
         T greedy_value = *last_issued_from_input;
         result_list.push_back( greedy_value );
-
         std::sort( temp.begin(), temp.end(), priority_func );
         typename std::vector< T >::iterator iter = temp.begin();
         for ( unsigned count = 0; count < num_warps_to_add; ++count, ++iter ) {
@@ -837,7 +840,8 @@ void scheduler_unit::order_by_priority( std::vector< T >& result_list,
             }
         }
     } else if ( ORDERED_PRIORITY_FUNC_ONLY == ordering ) {
-        std::sort( temp.begin(), temp.end(), priority_func );
+      std::sort( temp.begin(), temp.end(), priority_func );
+      assert(0);
         typename std::vector< T >::iterator iter = temp.begin();
         for ( unsigned count = 0; count < num_warps_to_add; ++count, ++iter ) {
             result_list.push_back( *iter );
@@ -2903,7 +2907,7 @@ bool shd_warp_t::hardware_done() const
 }
 
 bool shd_warp_t::waiting() 
-{
+{  
     if ( functional_done() ) {
         // waiting to be initialized with a kernel
         return true;

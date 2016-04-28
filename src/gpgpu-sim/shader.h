@@ -118,6 +118,7 @@ public:
 	tw_nInst = 0;
         tw_nStall = 0;
         tw_warp_entered_cycle = 0;
+	tw_warp_completed_cycle = 0;
         tw_num_completed_inst = 0;
         tw_last_schedule_cycle = 0;
 	//**************************************/
@@ -146,6 +147,7 @@ public:
 	tw_nInst = 0;
 	tw_nStall = 0;
 	tw_warp_entered_cycle = 0;
+	tw_warp_completed_cycle = 0;
 	tw_num_completed_inst = 0;
 	tw_last_schedule_cycle = 0;
         //**************************************/ 
@@ -260,7 +262,16 @@ public:
     void tw_warp_enter(unsigned cycle, unsigned ninst);
     void tw_warp_issue(unsigned cycle, address_type npc, unsigned isize);
     void tw_warp_complete();
+    void tw_warp_exit(unsigned cycle);
     void tw_cpl_calculate(bool avg_cpi, bool stall, unsigned cycle);
+    unsigned tw_get_warp_execution_cycles() const {
+      if (tw_warp_completed_cycle <= tw_warp_entered_cycle){
+	printf("\nTW: %d,%d, Cycles: %d %d\n", m_cta_id, m_warp_id, tw_warp_entered_cycle, tw_warp_completed_cycle);
+	assert(0);
+      }
+      assert(tw_warp_entered_cycle < tw_warp_completed_cycle);
+      return tw_warp_completed_cycle - tw_warp_entered_cycle;
+    }
     //**********************************************/
 
 private:
@@ -306,6 +317,7 @@ private:
     unsigned tw_nStall;
     // For avg CPI
     unsigned tw_warp_entered_cycle;
+    unsigned tw_warp_completed_cycle;
     unsigned tw_num_completed_inst;
     // For nStall
     unsigned tw_last_schedule_cycle;
@@ -417,7 +429,7 @@ public:
     static bool sort_warps_by_oldest_dynamic_id(shd_warp_t* lhs, shd_warp_t* rhs);
 
     //---------US - 4/22-----------//
-    static bool sort_warps_by_criticality(shd_warp_t* lhs, shd_warp_t* rhs);
+    //    static bool sort_warps_by_criticality(shd_warp_t* lhs, shd_warp_t* rhs);
     //---------US - 4/22-----------//
     
     // Derived classes can override this function to populate
@@ -510,6 +522,11 @@ public:
     virtual void done_adding_supervised_warps() {
         m_last_supervised_issued = m_supervised_warps.begin();		//Check whether to keep it as m-sup_warps.begin or end//
     }
+    void order_by_priority(std::vector<shd_warp_t*>& result_list, 
+			   const std::vector<shd_warp_t*>& input_list,
+			   const std::vector<shd_warp_t*>::const_iterator& last_issued_from_input,
+			   unsigned num_warps_to_add);
+    void sort_warps(std::vector<shd_warp_t*>& temp);
 };
 
 //---------US - 4/22-----------//
@@ -1386,6 +1403,7 @@ struct shader_core_config : public core_config
     //************* TW: 04/26/16 *************/
     bool tw_gpgpu_oracle_cpl; // on = generate oracle CPL for 1st run and use the info at 2nd run
     char* tw_gpgpu_oracle_scheduler_string; // oracle CPL should be get from which previous scheduler info
+    bool tw_oracle_cpl_exec_cycles; // on = use execution cycles from enter to complete, off = use execution cycle distribution
     bool tw_actual_cpl_static_ninst; // on = use static number of inst, off = use zero
     bool tw_actual_cpl_real_cpi; // on = use average cpi, off = assume cpi for all warps are the same (1.0)
     bool tw_actual_cpl_stall; // on = consider stall cycles

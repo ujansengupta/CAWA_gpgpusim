@@ -16,7 +16,7 @@
 #include <string.h>
 #include <algorithm>
 //#define TW_DEBUG
-//#define TW_DEBUG_NEW
+#define TW_DEBUG_NEW
 
 //***************** class gpgpu_sim *********************/
 void gpgpu_sim::tw_store_oracle_cpl() const
@@ -142,6 +142,9 @@ void shader_core_config::tw_cawa_reg_options(class OptionParser * opp)
   option_parser_register(opp, "-gpgpu_oracle_counter_from_scheduler", OPT_CSTR, &tw_gpgpu_oracle_scheduler_string,
 			 "oracle counter from which previous scheduler",
 			 "gto");
+  option_parser_register(opp, "-caws_oracle_cpl_exec_cycles", OPT_BOOL, &tw_oracle_cpl_exec_cycles,
+			 "on = use execution cycles from enter to complete, off = use execution cycle distribution",
+			 "0");
   option_parser_register(opp, "-caws_actual_cpl_static_ninst", OPT_BOOL, &tw_actual_cpl_static_ninst,
 			 "in caws, use static instruction count as initial counter for actual counter or not",
 			 "0");
@@ -185,9 +188,16 @@ void shader_core_ctx::tw_record_oracle_cpl(unsigned cta_num)
 #ifdef TW_DEBUG_NEW
     printf("\t W%d: %d", i, m_stats->tw_warp_cta_cycle_dist[m_sid][i]);
 #endif
-    m_stats->tw_cpl_actual[m_kernel->get_uid()-1][tw_cta_num_in_kernel[cta_num]+1][i-start_warp_id] = m_stats->tw_warp_cta_cycle_dist[m_sid][i];
+    if (m_config->tw_oracle_cpl_exec_cycles){
+      m_stats->tw_cpl_actual[m_kernel->get_uid()-1][tw_cta_num_in_kernel[cta_num]+1][i-start_warp_id] = m_warp[i].tw_get_warp_execution_cycles();
+    }
+    else{
+      m_stats->tw_cpl_actual[m_kernel->get_uid()-1][tw_cta_num_in_kernel[cta_num]+1][i-start_warp_id] = m_stats->tw_warp_cta_cycle_dist[m_sid][i];
+    }
   }
+#ifdef TW_DEBUG_NEW
   printf("\n");
+#endif
 }
 
 std::vector<float> shader_core_ctx::tw_get_current_CPL_counters() const
@@ -233,9 +243,13 @@ void shader_core_ctx::tw_calculate_cpl_accuracy() const
   if (m_kernel == NULL)
     return;
   for (unsigned i = 0; i < kernel_max_cta_per_shader; i++){
+    if (m_cta_status[i] == 0)
+      break;
     //Find critical warp of the thread block
     unsigned start_warp_id, end_warp_id;
     tw_get_start_end_warp_id(&start_warp_id, &end_warp_id, i);
+    assert(start_warp_id < m_warp.size() && end_warp_id <= m_warp.size());
+    assert(end_warp_id - start_warp_id == 8);
     unsigned crit_warp = start_warp_id;
     for (unsigned j = start_warp_id; j < end_warp_id; j++){
       if (m_warp[j].tw_get_oracle_CPL() > m_warp[crit_warp].tw_get_oracle_CPL()){
@@ -245,7 +259,7 @@ void shader_core_ctx::tw_calculate_cpl_accuracy() const
     //Check if its actual counter is larger than 50% of the other warps
     unsigned num_larger = 0;
     for (unsigned j = start_warp_id; j < end_warp_id; j++){
-      if (m_warp[j].tw_get_CPL() >= m_warp[crit_warp].tw_get_CPL()){
+      if (m_warp[crit_warp].tw_get_CPL() >= m_warp[j].tw_get_CPL()){
 	num_larger++;
       }
     }
@@ -254,10 +268,10 @@ void shader_core_ctx::tw_calculate_cpl_accuracy() const
     }
 #ifdef TW_DEBUG_NEW
     else{
+      printf("Found an inaccurate CPL\n");
       for (unsigned j = start_warp_id; j < end_warp_id; j++){
 	printf("TW:[W%d] Oracle: %d Actual: %f\n", j, m_warp[j].tw_get_oracle_CPL(), m_warp[j].tw_get_CPL());
       }
-      //      assert(0);
     }
 #endif
     m_stats->tw_total_cpl_for_accuracy++;
@@ -275,12 +289,12 @@ void shader_core_ctx::tw_calculate_cpl(unsigned cycle)
     printf("W%d %.2f, ", i, m_warp[i].tw_get_CPL());
 #endif
   }
-  if (m_config->tw_calculate_cpl_accuracy){
-    tw_calculate_cpl_accuracy();
-  }
 #ifdef TW_DEBUG_NEW
   printf("\n");
 #endif
+  if (m_config->tw_calculate_cpl_accuracy){
+    tw_calculate_cpl_accuracy();
+  }
 }
 unsigned shader_core_ctx::tw_get_static_ninst(unsigned warp_id)
 {
@@ -351,9 +365,17 @@ void shd_warp_t::tw_warp_issue(unsigned cycle, address_type npc, unsigned isize)
   //calculate nInst changes
   if (npc != (address_type) -1){
     if (npc < m_next_pc){
+#ifdef TW_DEBUG_NEW
+      printf("Backedges: TW: warp %d: curr PC: %d, next PC: %d, new nInst: %d\n", m_warp_id, m_next_pc, npc, tw_nInst);
+#endif
       tw_nInst += (m_next_pc - npc) / isize + 1;
     }
     else{
+#ifdef TW_DEBUG_NEW
+      if ((npc - m_next_pc) / isize - 1 != 0){
+	printf("Skips: TW: warp %d: curr PC: %d, next PC: %d, new nInst: %d\n", m_warp_id, m_next_pc, npc, tw_nInst);
+      }
+#endif
       tw_nInst -= (npc - m_next_pc) / isize - 1;
     }
 #ifdef TW_DEBUG_NEW
@@ -371,4 +393,13 @@ void shd_warp_t::tw_cpl_calculate(bool avg_cpi, bool stall, unsigned cycle)
   float cpi = avg_cpi ? 1.0 * (cycle - tw_warp_entered_cycle) / tw_num_completed_inst : 1.0;
   tw_cpl_actual = cpi * tw_nInst;
   tw_cpl_actual += stall ? 1.0 * tw_nStall : 0.0;
+  printf("TW: W%d: %d %.2f %d %.2f\n", tw_nInst, cpi, tw_nStall, tw_cpl_actual);
+}
+void shd_warp_t::tw_warp_exit(unsigned cycle)
+{
+#ifdef TW_DEBUG_NEW
+  printf("Complete W%d @ Cycle %d, nInst: %d, nStall: %d, enter: %d, complete_insts: %d\n", m_warp_id, cycle, tw_nInst, tw_nStall, tw_warp_entered_cycle, tw_num_completed_inst);
+  //  assert(0);
+#endif
+  tw_warp_completed_cycle = cycle;
 }

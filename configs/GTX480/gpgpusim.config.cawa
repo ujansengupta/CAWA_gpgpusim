@@ -134,4 +134,3 @@
 #-trace_sampling_core 0
 
 # Added for CAWA
--gpgpu_load_oracle_counter 1
