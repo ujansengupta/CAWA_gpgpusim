@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 #configs
-SRC_PATH=gpgpusim
+SRC_PATH=gpgpu-sim_distribution
 OUT=results.txt
 FIRST=no
 LOAD=yes

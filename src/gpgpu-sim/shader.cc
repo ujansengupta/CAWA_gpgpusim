@@ -54,6 +54,7 @@
 
 /////////////////////////////////////////////////////////////////////////////
 
+
 std::list<unsigned> shader_core_ctx::get_regs_written( const inst_t &fvt ) const
 {
    std::list<unsigned> result;
@@ -1327,6 +1328,7 @@ void shader_core_ctx::writeback()
     }
 }
 
+		 
 bool ldst_unit::shared_cycle( warp_inst_t &inst, mem_stage_stall_type &rc_fail, mem_stage_access_type &fail_type)
 {
    if( inst.space.get_type() != shared_space )
@@ -1394,6 +1396,7 @@ mem_stage_stall_type ldst_unit::process_memory_access_queue( cache_t *cache, war
 
     //const mem_access_t &access = inst.accessq_back();
     mem_fetch *mf = m_mf_allocator->alloc(inst,inst.accessq_back());
+	mf->req_criticality=m_core->get_warp_critical(mf->get_wid());
     std::list<cache_event> events;
     enum cache_request_status status = cache->access(mf->get_addr(),mf,gpu_sim_cycle+gpu_tot_sim_cycle,events);
     return process_cache_access( cache, mf->get_addr(), inst, events, mf, status );
@@ -1671,6 +1674,18 @@ ldst_unit::ldst_unit( mem_fetch_interface *icnt,
     if( !m_config->m_L1D_config.disabled() ) {
         char L1D_name[STRSIZE];
         snprintf(L1D_name, STRSIZE, "L1D_%03d", m_sid);
+		//*****David-4/22*******************************************/
+		//Checking if CACP enabled
+		if(m_config->dj_gpgpu_with_cacp)
+		 m_L1D = (l1_cache*)new l1_cache_cacp( L1D_name,
+                              m_config->m_L1D_config,
+                              m_sid,
+                              get_shader_normal_cache_id(),
+                              m_icnt,
+                              m_mf_allocator,
+                              IN_L1D_MISS_QUEUE );
+		else
+			//*****David-4/22*******************************************/
         m_L1D = new l1_cache( L1D_name,
                               m_config->m_L1D_config,
                               m_sid,

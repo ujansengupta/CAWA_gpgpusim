@@ -60,7 +60,7 @@ stream_manager *g_stream_manager;
 static int sg_argc = 3;
 static const char *sg_argv[] = {"", "-config","gpgpusim.config"};
 
-
+//Testing
 
 static void print_simulation_time();
 

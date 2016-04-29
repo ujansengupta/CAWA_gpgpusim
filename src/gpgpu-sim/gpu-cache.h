@@ -68,7 +68,11 @@ struct cache_block_t {
         m_alloc_time=0;
         m_fill_time=0;
         m_last_access_time=0;
+	
+	c_reuse=0;
+	nc_reuse=0;
         m_status=INVALID;
+		
     }
     void allocate( new_addr_type tag, new_addr_type block_addr, unsigned time )
     {
@@ -92,11 +96,20 @@ struct cache_block_t {
     unsigned         m_last_access_time;
     unsigned         m_fill_time;
     cache_block_state    m_status;
+		
+	//*****David-4/21*******************************************/
+	//new cache block members
+	//int recency_cnt;//for SRRIP replacement policy;
+	bool c_reuse;
+	bool nc_reuse;
+	int sig;//signature for previous access. Update on every hit.
+	//*****David-4/21*******************************************/
 };
 
 enum replacement_policy_t {
     LRU,
-    FIFO
+    FIFO,
+
 };
 
 enum write_policy_t {
@@ -164,6 +177,8 @@ public:
         switch (rp) {
         case 'L': m_replacement_policy = LRU; break;
         case 'F': m_replacement_policy = FIFO; break;
+		
+		
         default: exit_parse_error();
         }
         switch (wp) {
@@ -175,8 +190,8 @@ public:
         default: exit_parse_error();
         }
         switch (ap) {
-        case 'm': m_alloc_policy = ON_MISS; break;
-        case 'f': m_alloc_policy = ON_FILL; break;
+			case 'm': m_alloc_policy = ON_MISS; break;
+			case 'f': m_alloc_policy = ON_FILL; break;
         default: exit_parse_error();
         }
         switch (mshr_type) {
@@ -270,7 +285,10 @@ public:
     char *m_config_stringPrefL1;
     char *m_config_stringPrefShared;
     FuncCache cache_status;
-
+    unsigned m_assoc;
+     enum allocation_policy_t m_alloc_policy;        // 'm' = allocate on miss, 'f' = allocate on fill
+   
+    unsigned m_nset;
 protected:
     void exit_parse_error()
     {
@@ -282,13 +300,12 @@ protected:
     bool m_disabled;
     unsigned m_line_sz;
     unsigned m_line_sz_log2;
-    unsigned m_nset;
+    
     unsigned m_nset_log2;
-    unsigned m_assoc;
+    
 
     enum replacement_policy_t m_replacement_policy; // 'L' = LRU, 'F' = FIFO
     enum write_policy_t m_write_policy;             // 'T' = write through, 'B' = write back, 'R' = read only
-    enum allocation_policy_t m_alloc_policy;        // 'm' = allocate on miss, 'f' = allocate on fill
     enum mshr_config_t m_mshr_type;
 
     write_allocate_policy_t m_write_alloc_policy;	// 'W' = Write allocate, 'N' = No write allocate
@@ -341,6 +358,7 @@ public:
     ~tag_array();
 
     enum cache_request_status probe( new_addr_type addr, unsigned &idx ) const;
+    virtual enum cache_request_status probe( new_addr_type addr, unsigned &idx, bool critical, unsigned pc);
     enum cache_request_status access( new_addr_type addr, unsigned time, unsigned &idx );
     enum cache_request_status access( new_addr_type addr, unsigned time, unsigned &idx, bool &wb, cache_block_t &evicted );
 
@@ -387,7 +405,36 @@ protected:
     int m_core_id; // which shader core is using this
     int m_type_id; // what kind of cache is this (normal, texture, constant)
 };
-
+//*****David-4/24*******************************************/
+class tag_array_CACP :public tag_array{
+	int *CCBP;
+	int *SHiP;
+	public:
+	tag_array_CACP(cache_config &config, int core_id, int type_id ):tag_array(config,
+                       core_id, type_id ){
+		
+		CCBP=new int[256]; 
+		SHiP=new int[256]; 
+		for(int i=0;i<256;i++)
+			SHiP[i]=3;
+		for(int i=0;i<256;i++)
+			CCBP[i]=1;//Currently setting to 1. need to experiment for better values.
+	}
+	 enum cache_request_status probe( new_addr_type addr, unsigned &idx, bool critical, unsigned pc);
+	 void cacp_hit(bool critical, unsigned &idx);
+	 void cacp_eviction(unsigned &idx, unsigned set_index);
+	protected:
+	tag_array_CACP( cache_config &config, int core_id, int type_id, cache_block_t* new_lines ):tag_array( config, core_id, type_id, new_lines){
+		CCBP=new int[256]; 
+		SHiP=new int[256]; 
+		for(int i=0;i<256;i++)
+			SHiP[i]=3;
+		for(int i=0;i<256;i++)
+			CCBP[i]=1;
+   }
+  
+};
+//*****David-4/24*******************************************/
 class mshr_table {
 public:
     mshr_table( unsigned num_entries, unsigned max_merged )
@@ -950,9 +997,45 @@ protected:
     : data_cache( name,
                   config,
                   core_id,type_id,memport,mfcreator,status, new_tag_array, L1_WR_ALLOC_R, L1_WRBK_ACC ){}
+   
 
 };
 
+//*****David-4/24*******************************************/
+//CACP version of L1 cache
+class l1_cache_cacp : public data_cache {
+public:
+	
+	
+    l1_cache_cacp(const char *name, cache_config &config,
+            int core_id, int type_id, mem_fetch_interface *memport,
+            mem_fetch_allocator *mfcreator, enum mem_fetch_status status )
+            : data_cache(name,config,core_id,type_id,memport,mfcreator,status, L1_WR_ALLOC_R, L1_WRBK_ACC){}
+
+    virtual ~l1_cache_cacp(){}
+
+    virtual enum cache_request_status
+        access( new_addr_type addr,
+                mem_fetch *mf,
+                unsigned time,
+                std::list<cache_event> &events );
+
+protected:
+    l1_cache_cacp( const char *name,
+              cache_config &config,
+              int core_id,
+              int type_id,
+              mem_fetch_interface *memport,
+              mem_fetch_allocator *mfcreator,
+              enum mem_fetch_status status,
+              tag_array_CACP* new_tag_array )
+    : data_cache( name,
+                  config,
+                  core_id,type_id,memport,mfcreator,status, new_tag_array, L1_WR_ALLOC_R, L1_WRBK_ACC ){}
+   
+
+};
+//*****David-4/24*******************************************/
 /// Models second level shared cache with global write-back
 /// and write-allocate policies
 class l2_cache : public data_cache {
