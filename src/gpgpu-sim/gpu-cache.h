@@ -358,6 +358,7 @@ public:
     ~tag_array();
 
     enum cache_request_status probe( new_addr_type addr, unsigned &idx ) const;
+    virtual enum cache_request_status probe( new_addr_type addr, unsigned &idx, bool critical, unsigned pc);
     enum cache_request_status access( new_addr_type addr, unsigned time, unsigned &idx );
     enum cache_request_status access( new_addr_type addr, unsigned time, unsigned &idx, bool &wb, cache_block_t &evicted );
 
@@ -419,7 +420,7 @@ class tag_array_CACP :public tag_array{
 		for(int i=0;i<256;i++)
 			CCBP[i]=1;//Currently setting to 1. need to experiment for better values.
 	}
-	 enum cache_request_status probe( new_addr_type addr, unsigned &idx, bool critical );
+	 enum cache_request_status probe( new_addr_type addr, unsigned &idx, bool critical, unsigned pc);
 	 void cacp_hit(bool critical, unsigned &idx);
 	 void cacp_eviction(unsigned &idx, unsigned set_index);
 	protected:

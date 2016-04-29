@@ -34,7 +34,7 @@
  
 //***************** class tag_array_CACP *********************/
 
-enum cache_request_status tag_array_CACP::probe( new_addr_type addr, unsigned &idx, bool critical, unsigned pc )  {
+ enum cache_request_status tag_array_CACP::probe( new_addr_type addr, unsigned &idx, bool critical, unsigned pc )  {
     //assert( m_config.m_write_policy == READ_ONLY );
     unsigned signature=(addr & 255)^(pc & 255);
 	//unsigned signature=last 8 bits of PC and request addrees. Needs PC address sent here.
@@ -180,3 +180,6 @@ void tag_array_CACP::cacp_eviction(unsigned &idx, unsigned set_index){
 	}
 			
 }
+/*
+enum cache_request_status  tag_array::probe( new_addr_type addr, unsigned &idx, bool critical, unsigned pc)
+{}*/
