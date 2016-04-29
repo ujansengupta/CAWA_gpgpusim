@@ -16,7 +16,7 @@
 #include <string.h>
 #include <algorithm>
 //#define TW_DEBUG
-#define TW_DEBUG_NEW
+//#define TW_DEBUG_NEW
 
 //***************** class gpgpu_sim *********************/
 void gpgpu_sim::tw_store_oracle_cpl() const
@@ -393,7 +393,9 @@ void shd_warp_t::tw_cpl_calculate(bool avg_cpi, bool stall, unsigned cycle)
   float cpi = avg_cpi ? 1.0 * (cycle - tw_warp_entered_cycle) / tw_num_completed_inst : 1.0;
   tw_cpl_actual = cpi * tw_nInst;
   tw_cpl_actual += stall ? 1.0 * tw_nStall : 0.0;
-  printf("TW: W%d: %d %.2f %d %.2f\n", tw_nInst, cpi, tw_nStall, tw_cpl_actual);
+#ifdef TW_DEBUG_NEW
+  printf("TW: W%d: %d %.2f %d %.2f\n", m_warp_id, tw_nInst, cpi, tw_nStall, tw_cpl_actual);
+#endif
 }
 void shd_warp_t::tw_warp_exit(unsigned cycle)
 {
