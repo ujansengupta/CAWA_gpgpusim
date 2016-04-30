@@ -24,6 +24,12 @@ config()
     if [ "$5" = "yes" ]
     then
 	printf "\n-gpgpu_with_oracle_cpl 0" >> gpgpusim.config
+    else
+	#record CPLs for cawa oracle
+	if [ "$2" = "cawa" ]
+	then
+	    printf "\n-gpgpu_store_oracle_counter 1" >> gpgpusim.config
+	fi
     fi
     if [ "$6" = "1" ]
     then

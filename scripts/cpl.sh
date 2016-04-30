@@ -28,7 +28,7 @@ store_cpl(){
     bench_pool=$1
     for bench in ${bench_pool[@]};
     do
-	if [ -f gpgpusim/oracleCPLs/${bench}.${2}.cpl${3} ]
+    if [ -f gpgpusim/oracleCPLs/${bench}.${2}.cpl${3} ]
         then
             rm gpgpusim/oracleCPLs/${bench}.${2}.cpl${3}
         fi

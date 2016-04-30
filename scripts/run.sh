@@ -1,15 +1,15 @@
 #!/bin/bash
 set -e
 #configs
-SRC_PATH=gpgpu-sim_distribution
+SRC_PATH=gpgpusim
 OUT=results.txt
 FIRST=no
 LOAD=yes
-CACP=no
+CACP=yes
 #for oracle counter
 ORACLE_TYPE=1
 #for actual counter
-AVG_CPI=0
+AVG_CPI=1
 STALL=1
 #bench_pool=(AES BFS CP DG LIB LPS MUM NN NQU RAY STO WP)
 bench_pool=(AES BFS LPS MUM NN NQU RAY STO WP)
