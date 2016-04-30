@@ -354,12 +354,8 @@ enum scheduler_prioritization_type
     SCHEDULER_PRIORITIZATION_YOUNGEST, // Youngest First
     
     //---------US - 4/22-----------//
-    SCHEDULER_PRIORITIZATION_CAWS  //Criticality Aware
+    SCHEDULER_PRIORITIZATION_CAWA  //Criticality Aware and GTO
     //---------US - 4/22-----------//
-    
-    //---------US - 4/30-----------//
-    SCHEDULER_PRIORITIZATION_GCAWS //Criticality Aware and Greedy
-    //---------US - 4/30-----------//
 };
 
 // Each of these corresponds to a string value in the gpgpsim.config file
@@ -372,12 +368,8 @@ enum concrete_scheduler
     CONCRETE_SCHEDULER_WARP_LIMITING,
     NUM_CONCRETE_SCHEDULERS,
     //---------US - 4/22-----------//
-    CONCRETE_SCHEDULER_CAWS  //Criticality Aware 
+    CONCRETE_SCHEDULER_CAWA  //Criticality Aware and GTO
     //---------US - 4/22-----------//
-    
-    //---------US - 4/30-----------//
-    CONCRETE_SCHEDULER_GCAWS  //Criticality Aware and Greedy
-    //---------US - 4/30-----------//
 };
 
 class scheduler_unit { //this can be copied freely, so can be used in std containers.
@@ -547,7 +539,6 @@ public:
 
 //---------US - 4/22-----------//
 
-//---------US - 4/30-----------//
 class gcaws_scheduler : public scheduler_unit {
 public:
 	gcaws_scheduler ( shader_core_stats* stats, shader_core_ctx* shader,
@@ -570,7 +561,7 @@ public:
     void sort_warps(std::vector<shd_warp_t*>& temp);
 };
 
-//---------US - 4/30-----------//
+
 
 class two_level_active_scheduler : public scheduler_unit {
 public:
