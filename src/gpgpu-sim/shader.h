@@ -327,9 +327,7 @@ private:
     unsigned tw_num_completed_inst;
     // For nStall
     unsigned tw_last_schedule_cycle;
-    //************************************************/
-	
-    
+    //************************************************/    
 };
 
 
