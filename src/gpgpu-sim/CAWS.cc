@@ -12,7 +12,8 @@
 //***************** class shader.h *********************/ 
 bool sort_warps_by_criticality(shd_warp_t* lhs, shd_warp_t* rhs);
 
-void cawa_scheduler::order_warps()
+//------------------ GCAWS -------------------//
+void gcaws_scheduler::order_warps()
 {
   assert(m_supervised_warps.size());
   order_by_priority( m_next_cycle_prioritized_warps,
@@ -21,7 +22,7 @@ void cawa_scheduler::order_warps()
 		     m_supervised_warps.size() );
 }
 
-void cawa_scheduler::order_by_priority(std::vector<shd_warp_t*>& result_list,
+void gcaws_scheduler::order_by_priority(std::vector<shd_warp_t*>& result_list,
 				       const std::vector<shd_warp_t*>& input_list,
 				       const std::vector<shd_warp_t*>::const_iterator& last_issued_from_input,
 				       unsigned num_warps_to_add)
@@ -29,8 +30,12 @@ void cawa_scheduler::order_by_priority(std::vector<shd_warp_t*>& result_list,
   assert( num_warps_to_add <= input_list.size() );
   result_list.clear();
   std::vector<shd_warp_t*> temp = input_list;
+  
+  //-------- Greedy --------//
   shd_warp_t* greedy_value = *last_issued_from_input;
   result_list.push_back(greedy_value);
+  //--------        --------//
+  
   sort_warps(temp);
   std::vector<shd_warp_t*>::iterator iter = temp.begin();
   for ( unsigned count = 0; count < num_warps_to_add; ++count, ++iter ){
@@ -40,7 +45,7 @@ void cawa_scheduler::order_by_priority(std::vector<shd_warp_t*>& result_list,
   }
 }
 
-void cawa_scheduler::sort_warps(std::vector<shd_warp_t*>& temp){
+void gcaws_scheduler::sort_warps(std::vector<shd_warp_t*>& temp){
   for (unsigned i = 0; i < temp.size()-1; i++){
     unsigned jMax = i;
     for (unsigned j = i+1; j < temp.size(); j++){
@@ -56,6 +61,54 @@ void cawa_scheduler::sort_warps(std::vector<shd_warp_t*>& temp){
   }
 }
 
+
+//------------------ GCAWS -------------------//
+
+
+
+//------------------ CAWS -------------------//
+void caws_scheduler::order_warps()
+{
+  assert(m_supervised_warps.size());
+  order_by_priority( m_next_cycle_prioritized_warps,
+		     m_supervised_warps,
+		     m_last_supervised_issued,
+		     m_supervised_warps.size() );
+}
+
+void caws_scheduler::order_by_priority(std::vector<shd_warp_t*>& result_list,
+				       const std::vector<shd_warp_t*>& input_list,
+				       const std::vector<shd_warp_t*>::const_iterator& last_issued_from_input,
+				       unsigned num_warps_to_add)
+{
+  assert( num_warps_to_add <= input_list.size() );
+  result_list.clear();
+  std::vector<shd_warp_t*> temp = input_list;
+  
+  sort_warps(temp);
+  std::vector<shd_warp_t*>::iterator iter = temp.begin();
+  for ( unsigned count = 0; count < num_warps_to_add; ++count, ++iter ){
+      result_list.push_back( *iter );
+  }
+}
+
+void caws_scheduler::sort_warps(std::vector<shd_warp_t*>& temp){
+  for (unsigned i = 0; i < temp.size()-1; i++){
+    unsigned jMax = i;
+    for (unsigned j = i+1; j < temp.size(); j++){
+      if (sort_warps_by_criticality(temp[j], temp[jMax])) {
+	jMax = j;
+      }
+    }
+    if (jMax != i) {
+      shd_warp_t* tmp = temp[i];
+      temp[i] = temp[jMax];
+      temp[jMax] = tmp;
+    }
+  }
+}
+
+//------------------ CAWS -------------------//
 bool sort_warps_by_criticality(shd_warp_t* lhs, shd_warp_t* rhs)
 {
   /*

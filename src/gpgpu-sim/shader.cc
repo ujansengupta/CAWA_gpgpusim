@@ -130,9 +130,14 @@ shader_core_ctx::shader_core_ctx( class gpgpu_sim *gpu,
                                          CONCRETE_SCHEDULER_LRR :      
                                                                      
                                          //---------US - 4/22-----------//
-                                         sched_config.find("cawa") != std::string::npos ?
-                                         CONCRETE_SCHEDULER_CAWA :
+                                         sched_config.find("caws") != std::string::npos ?
+                                         CONCRETE_SCHEDULER_CAWS :
                                          //---------US - 4/22-----------//
+                                         
+                                         //---------US - 4/30-----------//
+                                         sched_config.find("gcaws") != std::string::npos ?
+                                         CONCRETE_SCHEDULER_GCAWS :
+                                         //---------US - 4/30-----------//
                                          
                                          sched_config.find("two_level_active") != std::string::npos ?
                                          CONCRETE_SCHEDULER_TWO_LEVEL_ACTIVE :
@@ -191,9 +196,9 @@ shader_core_ctx::shader_core_ctx( class gpgpu_sim *gpu,
                 break;
                 
             //---------US - 4/22-----------//
-            case CONCRETE_SCHEDULER_CAWA:
+            case CONCRETE_SCHEDULER_CAWS:
                 schedulers.push_back(
-                    new cawa_scheduler( m_stats,
+                    new caws_scheduler( m_stats,
                                        this,
                                        m_scoreboard,
                                        m_simt_stack,
@@ -207,6 +212,22 @@ shader_core_ctx::shader_core_ctx( class gpgpu_sim *gpu,
                 break;
             //---------US - 4/22-----------//
             
+            //---------US - 4/30-----------//
+            case CONCRETE_SCHEDULER_GCAWS:
+                schedulers.push_back(
+                    new gcaws_scheduler( m_stats,
+                                       this,
+                                       m_scoreboard,
+                                       m_simt_stack,
+                                       &m_warp,
+                                       &m_pipeline_reg[ID_OC_SP],
+                                       &m_pipeline_reg[ID_OC_SFU],
+                                       &m_pipeline_reg[ID_OC_MEM],
+                                       i
+                                     )
+                );
+                break;
+            //---------US - 4/30-----------//
             
             case CONCRETE_SCHEDULER_WARP_LIMITING:
                 schedulers.push_back(

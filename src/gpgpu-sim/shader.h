@@ -352,8 +352,12 @@ enum scheduler_prioritization_type
     SCHEDULER_PRIORITIZATION_YOUNGEST, // Youngest First
     
     //---------US - 4/22-----------//
-    SCHEDULER_PRIORITIZATION_CAWA  //Criticality Aware and GTO
+    SCHEDULER_PRIORITIZATION_CAWS  //Criticality Aware
     //---------US - 4/22-----------//
+    
+    //---------US - 4/30-----------//
+    SCHEDULER_PRIORITIZATION_GCAWS //Criticality Aware and Greedy
+    //---------US - 4/30-----------//
 };
 
 // Each of these corresponds to a string value in the gpgpsim.config file
@@ -366,8 +370,12 @@ enum concrete_scheduler
     CONCRETE_SCHEDULER_WARP_LIMITING,
     NUM_CONCRETE_SCHEDULERS,
     //---------US - 4/22-----------//
-    CONCRETE_SCHEDULER_CAWA  //Criticality Aware and GTO
+    CONCRETE_SCHEDULER_CAWS  //Criticality Aware 
     //---------US - 4/22-----------//
+    
+    //---------US - 4/30-----------//
+    CONCRETE_SCHEDULER_GCAWS  //Criticality Aware and Greedy
+    //---------US - 4/30-----------//
 };
 
 class scheduler_unit { //this can be copied freely, so can be used in std containers.
@@ -513,9 +521,9 @@ public:
 
 //---------US - 4/22-----------//
 
-class cawa_scheduler : public scheduler_unit {
+class caws_scheduler : public scheduler_unit {
 public:
-	cawa_scheduler ( shader_core_stats* stats, shader_core_ctx* shader,
+	caws_scheduler ( shader_core_stats* stats, shader_core_ctx* shader,
                     Scoreboard* scoreboard, simt_stack** simt,
                     std::vector<shd_warp_t>* warp,
                     register_set* sp_out,
@@ -523,7 +531,7 @@ public:
                     register_set* mem_out,
                     int id )
 	: scheduler_unit ( stats, shader, scoreboard, simt, warp, sp_out, sfu_out, mem_out, id ){}
-	virtual ~cawa_scheduler () {}
+	virtual ~caws_scheduler () {}
 	virtual void order_warps ();
     virtual void done_adding_supervised_warps() {
         m_last_supervised_issued = m_supervised_warps.begin();		//Check whether to keep it as m-sup_warps.begin or end//
@@ -537,7 +545,30 @@ public:
 
 //---------US - 4/22-----------//
 
+//---------US - 4/30-----------//
+class gcaws_scheduler : public scheduler_unit {
+public:
+	gcaws_scheduler ( shader_core_stats* stats, shader_core_ctx* shader,
+                    Scoreboard* scoreboard, simt_stack** simt,
+                    std::vector<shd_warp_t>* warp,
+                    register_set* sp_out,
+                    register_set* sfu_out,
+                    register_set* mem_out,
+                    int id )
+	: scheduler_unit ( stats, shader, scoreboard, simt, warp, sp_out, sfu_out, mem_out, id ){}
+	virtual ~gcaws_scheduler () {}
+	virtual void order_warps ();
+    virtual void done_adding_supervised_warps() {
+        m_last_supervised_issued = m_supervised_warps.begin();		//Check whether to keep it as m-sup_warps.begin or end//
+    }
+    void order_by_priority(std::vector<shd_warp_t*>& result_list, 
+			   const std::vector<shd_warp_t*>& input_list,
+			   const std::vector<shd_warp_t*>::const_iterator& last_issued_from_input,
+			   unsigned num_warps_to_add);
+    void sort_warps(std::vector<shd_warp_t*>& temp);
+};
 
+//---------US - 4/30-----------//
 
 class two_level_active_scheduler : public scheduler_unit {
 public:
