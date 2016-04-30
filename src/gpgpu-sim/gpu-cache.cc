@@ -168,42 +168,42 @@ void tag_array::init( int core_id, int type_id )
 
     // check for hit or pending hit
     for (unsigned way=0; way<m_config.m_assoc; way++) {
-		unsigned index = set_index*m_config.m_assoc+way;
-        cache_block_t *line = &m_lines[index];
-        if (line->m_tag == tag) {
-            if ( line->m_status == RESERVED ) {
-                idx = index;
-                return HIT_RESERVED;
-			
-            } else if ( line->m_status == VALID ) {
-                idx = index;
-                return HIT;
-		  } else if ( line->m_status == MODIFIED ) {
-                idx = index;
-                return HIT;
-		    } else {
-                assert( line->m_status == INVALID );
-            }
-        }
-        if (line->m_status != RESERVED) {
-            all_reserved = false;
-            if (line->m_status == INVALID) {
-                invalid_line = index;
-            } else {
-                // valid line : keep track of most appropriate replacement candidate
-                if ( m_config.m_replacement_policy == LRU ) {
-                    if ( line->m_last_access_time < valid_timestamp ) {
-                        valid_timestamp = line->m_last_access_time;
-                        valid_line = index;
-                    }
-                } else if ( m_config.m_replacement_policy == FIFO ) {
-                    if ( line->m_alloc_time < valid_timestamp ) {
-                        valid_timestamp = line->m_alloc_time;
-                        valid_line = index;
-                    }
-                }
-            }
-        }
+      unsigned index = set_index*m_config.m_assoc+way;
+      cache_block_t *line = &m_lines[index];
+      if (line->m_tag == tag) {
+	if ( line->m_status == RESERVED ) {
+	  idx = index;
+	  return HIT_RESERVED;
+	  
+	} else if ( line->m_status == VALID ) {
+	  idx = index;
+	  return HIT;
+	} else if ( line->m_status == MODIFIED ) {
+	  idx = index;
+	  return HIT;
+	} else {
+	  assert( line->m_status == INVALID );
+	}
+      }
+      if (line->m_status != RESERVED) {
+	all_reserved = false;
+	if (line->m_status == INVALID) {
+	  invalid_line = index;
+	} else {
+	  // valid line : keep track of most appropriate replacement candidate
+	  if ( m_config.m_replacement_policy == LRU ) {
+	    if ( line->m_last_access_time < valid_timestamp ) {
+	      valid_timestamp = line->m_last_access_time;
+	      valid_line = index;
+	    }
+	  } else if ( m_config.m_replacement_policy == FIFO ) {
+	    if ( line->m_alloc_time < valid_timestamp ) {
+	      valid_timestamp = line->m_alloc_time;
+	      valid_line = index;
+	    }
+	  }
+	}
+      }
     }
     if ( all_reserved ) {
         assert( m_config.m_alloc_policy == ON_MISS ); 
@@ -1099,29 +1099,7 @@ l1_cache::access( new_addr_type addr,
 {
     return data_cache::access( addr, mf, time, events );
 }
-//*****David-4/24*******************************************/
-//adding cacp access copy
-enum cache_request_status
-l1_cache_cacp::access( new_addr_type addr,
-                  mem_fetch *mf,
-                  unsigned time,
-                  std::list<cache_event> &events )
-{
-	
-	 assert( mf->get_data_size() <= m_config.get_line_sz());
-    bool wr = mf->get_is_write();
-    new_addr_type block_addr = m_config.block_addr(addr);
-    unsigned cache_index = (unsigned)-1;
-	enum cache_request_status probe_status
-        = m_tag_array->probe( block_addr, cache_index , mf->req_criticality, mf->get_pc());
-    enum cache_request_status access_status
-        = process_tag_probe( wr, probe_status, addr, cache_index, mf, time, events );
-    m_stats.inc_stats(mf->get_access_type(),
-        m_stats.select_stats_status(probe_status, access_status));
-    return access_status;
-   // return data_cache::access( addr, mf, time, events );
-}
-//*****David-4/24*******************************************/
+
 // The l2 cache access function calls the base data_cache access
 // implementation.  When the L2 needs to diverge from L1, L2 specific
 // changes should be made here.

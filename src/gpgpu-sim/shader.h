@@ -122,6 +122,7 @@ public:
         tw_num_completed_inst = 0;
         tw_last_schedule_cycle = 0;
 	//**************************************/
+	criticality = false;
     }
     void init( address_type start_pc,
                unsigned cta_id,
@@ -151,6 +152,7 @@ public:
 	tw_num_completed_inst = 0;
 	tw_last_schedule_cycle = 0;
         //**************************************/ 
+	criticality = false;
     }
 
     bool functional_done() const;

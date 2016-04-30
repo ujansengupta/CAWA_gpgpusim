@@ -85,9 +85,9 @@ struct cache_block_t {
     }
     void fill( unsigned time )
     {
-        assert( m_status == RESERVED );
-        m_status=VALID;
-        m_fill_time=time;
+      assert( m_status == RESERVED );
+      m_status=VALID;
+      m_fill_time=time;
     }
 
     new_addr_type    m_tag;
@@ -358,7 +358,7 @@ public:
     ~tag_array();
 
     enum cache_request_status probe( new_addr_type addr, unsigned &idx ) const;
-    virtual enum cache_request_status probe( new_addr_type addr, unsigned &idx, bool critical, unsigned pc);
+    virtual enum cache_request_status probe( new_addr_type addr, unsigned &idx, bool critical, unsigned pc) {assert(0); return MISS; };
     enum cache_request_status access( new_addr_type addr, unsigned time, unsigned &idx );
     enum cache_request_status access( new_addr_type addr, unsigned time, unsigned &idx, bool &wb, cache_block_t &evicted );
 
@@ -420,7 +420,7 @@ class tag_array_CACP :public tag_array{
 		for(int i=0;i<256;i++)
 			CCBP[i]=1;//Currently setting to 1. need to experiment for better values.
 	}
-	 enum cache_request_status probe( new_addr_type addr, unsigned &idx, bool critical, unsigned pc);
+	 virtual enum cache_request_status probe( new_addr_type addr, unsigned &idx, bool critical, unsigned pc);
 	 void cacp_hit(bool critical, unsigned &idx);
 	 void cacp_eviction(unsigned &idx, unsigned set_index);
 	protected:
@@ -1010,7 +1010,7 @@ public:
     l1_cache_cacp(const char *name, cache_config &config,
             int core_id, int type_id, mem_fetch_interface *memport,
             mem_fetch_allocator *mfcreator, enum mem_fetch_status status )
-            : data_cache(name,config,core_id,type_id,memport,mfcreator,status, L1_WR_ALLOC_R, L1_WRBK_ACC){}
+      : data_cache(name,config,core_id,type_id,memport,mfcreator,status, L1_WR_ALLOC_R, L1_WRBK_ACC){}
 
     virtual ~l1_cache_cacp(){}
 
@@ -1020,7 +1020,7 @@ public:
                 unsigned time,
                 std::list<cache_event> &events );
 
-protected:
+    //protected:
     l1_cache_cacp( const char *name,
               cache_config &config,
               int core_id,
