@@ -128,16 +128,15 @@ shader_core_ctx::shader_core_ctx( class gpgpu_sim *gpu,
     std::string sched_config = m_config->gpgpu_scheduler_string;
     const concrete_scheduler scheduler = sched_config.find("lrr") != std::string::npos ?
                                          CONCRETE_SCHEDULER_LRR :      
-                                                                     
-                                         //---------US - 4/22-----------//
-                                         sched_config.find("caws") != std::string::npos ?
-                                         CONCRETE_SCHEDULER_CAWS :
-                                         //---------US - 4/22-----------//
-                                         
                                          //---------US - 4/30-----------//
                                          sched_config.find("gcaws") != std::string::npos ?
                                          CONCRETE_SCHEDULER_GCAWS :
                                          //---------US - 4/30-----------//
+
+                                         //---------US - 4/22-----------//
+                                         sched_config.find("caws") != std::string::npos ?
+                                         CONCRETE_SCHEDULER_CAWS :
+                                         //---------US - 4/22-----------//
                                          
                                          sched_config.find("two_level_active") != std::string::npos ?
                                          CONCRETE_SCHEDULER_TWO_LEVEL_ACTIVE :

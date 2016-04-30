@@ -352,7 +352,7 @@ enum scheduler_prioritization_type
     SCHEDULER_PRIORITIZATION_YOUNGEST, // Youngest First
     
     //---------US - 4/22-----------//
-    SCHEDULER_PRIORITIZATION_CAWS  //Criticality Aware
+    SCHEDULER_PRIORITIZATION_CAWS,  //Criticality Aware
     //---------US - 4/22-----------//
     
     //---------US - 4/30-----------//
@@ -370,7 +370,7 @@ enum concrete_scheduler
     CONCRETE_SCHEDULER_WARP_LIMITING,
     NUM_CONCRETE_SCHEDULERS,
     //---------US - 4/22-----------//
-    CONCRETE_SCHEDULER_CAWS  //Criticality Aware 
+    CONCRETE_SCHEDULER_CAWS,  //Criticality Aware 
     //---------US - 4/22-----------//
     
     //---------US - 4/30-----------//
@@ -534,7 +534,7 @@ public:
 	virtual ~caws_scheduler () {}
 	virtual void order_warps ();
     virtual void done_adding_supervised_warps() {
-        m_last_supervised_issued = m_supervised_warps.begin();		//Check whether to keep it as m-sup_warps.begin or end//
+        m_last_supervised_issued = m_supervised_warps.end();		//Check whether to keep it as m-sup_warps.begin or end//
     }
     void order_by_priority(std::vector<shd_warp_t*>& result_list, 
 			   const std::vector<shd_warp_t*>& input_list,
@@ -559,7 +559,7 @@ public:
 	virtual ~gcaws_scheduler () {}
 	virtual void order_warps ();
     virtual void done_adding_supervised_warps() {
-        m_last_supervised_issued = m_supervised_warps.begin();		//Check whether to keep it as m-sup_warps.begin or end//
+        m_last_supervised_issued = m_supervised_warps.end();		//Check whether to keep it as m-sup_warps.begin or end//
     }
     void order_by_priority(std::vector<shd_warp_t*>& result_list, 
 			   const std::vector<shd_warp_t*>& input_list,

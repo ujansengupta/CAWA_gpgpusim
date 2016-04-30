@@ -30,19 +30,26 @@ void gcaws_scheduler::order_by_priority(std::vector<shd_warp_t*>& result_list,
   assert( num_warps_to_add <= input_list.size() );
   result_list.clear();
   std::vector<shd_warp_t*> temp = input_list;
-  
   //-------- Greedy --------//
-  shd_warp_t* greedy_value = *last_issued_from_input;
-  result_list.push_back(greedy_value);
-  //--------        --------//
-  
-  sort_warps(temp);
-  std::vector<shd_warp_t*>::iterator iter = temp.begin();
-  for ( unsigned count = 0; count < num_warps_to_add; ++count, ++iter ){
-    if ( *iter != greedy_value ){
+  if (last_issued_from_input == input_list.end()){
+    sort_warps(temp);
+    std::vector<shd_warp_t*>::iterator iter = temp.begin();
+    for ( unsigned count = 0; count < num_warps_to_add; ++count, ++iter ){
       result_list.push_back( *iter );
     }
   }
+  else{
+    shd_warp_t* greedy_value = *last_issued_from_input;
+    result_list.push_back(greedy_value);
+    sort_warps(temp);
+    std::vector<shd_warp_t*>::iterator iter = temp.begin();
+    for ( unsigned count = 0; count < num_warps_to_add; ++count, ++iter ){
+      if ( *iter != greedy_value ){
+	result_list.push_back( *iter );
+      }
+    }
+  }
+  //--------        --------//
 }
 
 void gcaws_scheduler::sort_warps(std::vector<shd_warp_t*>& temp){
@@ -84,7 +91,6 @@ void caws_scheduler::order_by_priority(std::vector<shd_warp_t*>& result_list,
   assert( num_warps_to_add <= input_list.size() );
   result_list.clear();
   std::vector<shd_warp_t*> temp = input_list;
-  
   sort_warps(temp);
   std::vector<shd_warp_t*>::iterator iter = temp.begin();
   for ( unsigned count = 0; count < num_warps_to_add; ++count, ++iter ){

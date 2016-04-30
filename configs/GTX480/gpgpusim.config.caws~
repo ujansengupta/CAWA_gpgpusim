@@ -115,7 +115,7 @@
 # Loose round robbin scheduler
 #-gpgpu_scheduler lrr
 # Greedy then oldest scheduler
--gpgpu_scheduler gcaws
+-gpgpu_scheduler gto
 #-gpgpu_scheduler cawa
 
 # stat collection
@@ -134,8 +134,3 @@
 #-trace_sampling_core 0
 
 # Added for CAWA
--gpgpu_load_oracle_counter 1
--gpgpu_with_cacp 1
--caws_actual_cpl_real_cpi 1
--caws_actual_cpl_stall 1
--caws_oracle_cpl_exec_cycles 1
