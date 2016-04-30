@@ -420,6 +420,13 @@ public:
     simt_core_cluster * getSIMTCluster();
 
 
+    //********************** TW: 04/08/16 *******************/
+    void tw_store_oracle_cpl() const;
+    void tw_load_oracle_cpl();
+    //********************** TW: 04/26/16 *******************/
+    void tw_print_cpl_accuracy() const;
+    //*******************************************************/
+
 private:
    // clocks
    void reinit_clock_domains(void);

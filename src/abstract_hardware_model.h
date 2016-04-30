@@ -232,6 +232,13 @@ public:
    std::list<class ptx_thread_info *> &active_threads() { return m_active_threads; }
    class memory_space *get_param_memory() { return m_param_mem; }
 
+   //***************** TW: 04/07/16 **************/
+   unsigned tw_next_cta_num() const
+   {
+     return m_next_cta.x + m_next_cta.y * m_grid_dim.x + m_next_cta.z * m_grid_dim.x * m_grid_dim.y;
+   }
+   //*********************************************/
+
 private:
    kernel_info_t( const kernel_info_t & ); // disable copy constructor
    void operator=( const kernel_info_t & ); // disable copy operator
@@ -1041,7 +1048,7 @@ class core_t {
         virtual void checkExecutionStatusAndUpdate(warp_inst_t &inst, unsigned t, unsigned tid)=0;
         class gpgpu_sim * get_gpu() {return m_gpu;}
         void execute_warp_inst_t(warp_inst_t &inst, unsigned warpId =(unsigned)-1);
-        bool  ptx_thread_done( unsigned hw_thread_id ) const ;
+        bool ptx_thread_done( unsigned hw_thread_id ) const ;
         void updateSIMTStack(unsigned warpId, warp_inst_t * inst);
         void initilizeSIMTStack(unsigned warp_count, unsigned warps_size);
         void deleteSIMTStack();

@@ -54,6 +54,7 @@
 
 /////////////////////////////////////////////////////////////////////////////
 
+
 std::list<unsigned> shader_core_ctx::get_regs_written( const inst_t &fvt ) const
 {
    std::list<unsigned> result;
@@ -81,7 +82,7 @@ shader_core_ctx::shader_core_ctx( class gpgpu_sim *gpu,
     m_memory_config = mem_config;
     m_stats = stats;
     unsigned warp_size=config->warp_size;
-    
+
     m_sid = shader_id;
     m_tpc = tpc_id;
     
@@ -126,7 +127,17 @@ shader_core_ctx::shader_core_ctx( class gpgpu_sim *gpu,
     //must currently occur after all inputs have been initialized.
     std::string sched_config = m_config->gpgpu_scheduler_string;
     const concrete_scheduler scheduler = sched_config.find("lrr") != std::string::npos ?
-                                         CONCRETE_SCHEDULER_LRR :
+                                         CONCRETE_SCHEDULER_LRR :      
+                                         //---------US - 4/30-----------//
+                                         sched_config.find("gcaws") != std::string::npos ?
+                                         CONCRETE_SCHEDULER_GCAWS :
+                                         //---------US - 4/30-----------//
+
+                                         //---------US - 4/22-----------//
+                                         sched_config.find("caws") != std::string::npos ?
+                                         CONCRETE_SCHEDULER_CAWS :
+                                         //---------US - 4/22-----------//
+                                         
                                          sched_config.find("two_level_active") != std::string::npos ?
                                          CONCRETE_SCHEDULER_TWO_LEVEL_ACTIVE :
                                          sched_config.find("gto") != std::string::npos ?
@@ -182,6 +193,41 @@ shader_core_ctx::shader_core_ctx( class gpgpu_sim *gpu,
                                      )
                 );
                 break;
+                
+            //---------US - 4/22-----------//
+            case CONCRETE_SCHEDULER_CAWS:
+                schedulers.push_back(
+                    new caws_scheduler( m_stats,
+                                       this,
+                                       m_scoreboard,
+                                       m_simt_stack,
+                                       &m_warp,
+                                       &m_pipeline_reg[ID_OC_SP],
+                                       &m_pipeline_reg[ID_OC_SFU],
+                                       &m_pipeline_reg[ID_OC_MEM],
+                                       i
+                                     )
+                );
+                break;
+            //---------US - 4/22-----------//
+            
+            //---------US - 4/30-----------//
+            case CONCRETE_SCHEDULER_GCAWS:
+                schedulers.push_back(
+                    new gcaws_scheduler( m_stats,
+                                       this,
+                                       m_scoreboard,
+                                       m_simt_stack,
+                                       &m_warp,
+                                       &m_pipeline_reg[ID_OC_SP],
+                                       &m_pipeline_reg[ID_OC_SFU],
+                                       &m_pipeline_reg[ID_OC_MEM],
+                                       i
+                                     )
+                );
+                break;
+            //---------US - 4/30-----------//
+            
             case CONCRETE_SCHEDULER_WARP_LIMITING:
                 schedulers.push_back(
                     new swl_scheduler( m_stats,
@@ -311,6 +357,9 @@ void shader_core_ctx::reinit(unsigned start_thread, unsigned end_thread, bool re
    for (unsigned i = start_thread / m_config->warp_size; i < end_thread / m_config->warp_size; ++i) {
       m_warp[i].reset();
       m_simt_stack[i]->reset();
+      //************** TW: 04/07/16 ***************/
+      m_stats->tw_warp_cta_cycle_dist[m_sid][i] = 0;
+      //*******************************************/
    }
 }
 
@@ -333,10 +382,18 @@ void shader_core_ctx::init_warps( unsigned cta_id, unsigned start_thread, unsign
                 }
             }
             m_simt_stack[i]->launch(start_pc,active_threads);
-            m_warp[i].init(start_pc,cta_id,i,active_threads, m_dynamic_warp_id);
+	    //********************* TW: 04/20/16 *****************/	    
+	    //Load previously stored oracle CPL counters
+	    unsigned oracle_CPL = m_stats->tw_get_oracle_CPL_counter(m_kernel->get_uid()-1, tw_cta_num_in_kernel[cta_id], i - start_warp);
+            m_warp[i].init(start_pc,cta_id,i,active_threads, m_dynamic_warp_id, oracle_CPL);
+	    if (!m_config->tw_gpgpu_oracle_cpl){
+	      m_warp[i].tw_warp_enter(gpu_tot_sim_cycle+gpu_sim_cycle, tw_get_static_ninst(i));
+	    }
+	    //****************************************************/
             ++m_dynamic_warp_id;
             m_not_completed += n_active;
-      }
+
+	}
    }
 }
 
@@ -448,7 +505,6 @@ void shader_core_stats::print( FILE* fout ) const
    for (unsigned i = 3; i < m_config->warp_size + 3; i++) 
       fprintf(fout, "\tW%d:%d", i-2, shader_cycle_distro[i]);
    fprintf(fout, "\n");
-
    m_outgoing_traffic_stats->print(fout); 
    m_incoming_traffic_stats->print(fout); 
 }
@@ -608,6 +664,9 @@ void shader_core_ctx::fetch()
                     unsigned tid=warp_id*m_config->warp_size+t;
                     if( m_threadState[tid].m_active == true ) {
                         m_threadState[tid].m_active = false; 
+			//************ TW: 04/28/16 ***********/
+			m_warp[warp_id].tw_warp_exit(gpu_tot_sim_cycle+gpu_sim_cycle);
+			//*************************************/
                         unsigned cta_id = m_warp[warp_id].get_cta_id();
                         register_cta_thread_exit(cta_id);
                         m_not_completed -= 1;
@@ -616,8 +675,9 @@ void shader_core_ctx::fetch()
                         did_exit=true;
                     }
                 }
-                if( did_exit ) 
+                if( did_exit ){ 
                     m_warp[warp_id].set_done_exit();
+		}
             }
 
             // this code fetches instructions from the i-cache or generates memory requests
@@ -686,6 +746,10 @@ void shader_core_ctx::issue_warp( register_set& pipe_reg_set, const warp_inst_t*
     **pipe_reg = *next_inst; // static instruction information
     (*pipe_reg)->issue( active_mask, warp_id, gpu_tot_sim_cycle + gpu_sim_cycle, m_warp[warp_id].get_dynamic_warp_id() ); // dynamic instruction information
     m_stats->shader_cycle_distro[2+(*pipe_reg)->active_count()]++;
+    //********************* TW: 04/07/16 ************************/
+    assert(warp_id < m_config->max_warps_per_shader);
+    m_stats->tw_warp_cta_cycle_dist[m_sid][warp_id]++;
+    //***********************************************************/
     func_exec_inst( **pipe_reg );
     if( next_inst->op == BARRIER_OP ){
     	m_warp[warp_id].store_info_of_last_inst_at_barrier(*pipe_reg);
@@ -694,17 +758,27 @@ void shader_core_ctx::issue_warp( register_set& pipe_reg_set, const warp_inst_t*
     }else if( next_inst->op == MEMORY_BARRIER_OP ){
         m_warp[warp_id].set_membar();
     }
-
+    //********************* TW: 04/22/16 ***********************/
+    if (!m_config->tw_gpgpu_oracle_cpl){
+      address_type npc = tw_calculate_npc_per_warp(warp_id);
+      m_warp[warp_id].tw_warp_issue(gpu_tot_sim_cycle+gpu_sim_cycle, npc, next_inst->isize);
+    }
+    //**********************************************************/
     updateSIMTStack(warp_id,*pipe_reg);
     m_scoreboard->reserveRegisters(*pipe_reg);
     m_warp[warp_id].set_next_pc(next_inst->pc + next_inst->isize);
 }
 
 void shader_core_ctx::issue(){
-    //really is issue;
-    for (unsigned i = 0; i < schedulers.size(); i++) {
-        schedulers[i]->cycle();
-    }
+  //*************** TW: 04/23/16 ***************/
+  if (!m_config->tw_gpgpu_oracle_cpl){
+    tw_calculate_cpl(gpu_tot_sim_cycle + gpu_sim_cycle);
+  }
+  //********************************************/
+  //really is issue;
+  for (unsigned i = 0; i < schedulers.size(); i++) {
+    schedulers[i]->cycle();
+  }
 }
 
 shd_warp_t& scheduler_unit::warp(int i){
@@ -779,7 +853,6 @@ void scheduler_unit::order_by_priority( std::vector< T >& result_list,
     if ( ORDERING_GREEDY_THEN_PRIORITY_FUNC == ordering ) {
         T greedy_value = *last_issued_from_input;
         result_list.push_back( greedy_value );
-
         std::sort( temp.begin(), temp.end(), priority_func );
         typename std::vector< T >::iterator iter = temp.begin();
         for ( unsigned count = 0; count < num_warps_to_add; ++count, ++iter ) {
@@ -788,7 +861,8 @@ void scheduler_unit::order_by_priority( std::vector< T >& result_list,
             }
         }
     } else if ( ORDERED_PRIORITY_FUNC_ONLY == ordering ) {
-        std::sort( temp.begin(), temp.end(), priority_func );
+      std::sort( temp.begin(), temp.end(), priority_func );
+      assert(0);
         typename std::vector< T >::iterator iter = temp.begin();
         for ( unsigned count = 0; count < num_warps_to_add; ++count, ++iter ) {
             result_list.push_back( *iter );
@@ -847,7 +921,7 @@ void scheduler_unit::cycle()
                         assert( warp(warp_id).inst_in_pipeline() );
                         if ( (pI->op == LOAD_OP) || (pI->op == STORE_OP) || (pI->op == MEMORY_BARRIER_OP) ) {
                             if( m_mem_out->has_free() ) {
-                                m_shader->issue_warp(*m_mem_out,pI,active_mask,warp_id);
+			      m_shader->issue_warp(*m_mem_out,pI,active_mask,warp_id);
                                 issued++;
                                 issued_inst=true;
                                 warp_inst_issued = true;
@@ -857,13 +931,13 @@ void scheduler_unit::cycle()
                             bool sfu_pipe_avail = m_sfu_out->has_free();
                             if( sp_pipe_avail && (pI->op != SFU_OP) ) {
                                 // always prefer SP pipe for operations that can use both SP and SFU pipelines
-                                m_shader->issue_warp(*m_sp_out,pI,active_mask,warp_id);
+			      m_shader->issue_warp(*m_sp_out,pI,active_mask,warp_id);
                                 issued++;
                                 issued_inst=true;
                                 warp_inst_issued = true;
                             } else if ( (pI->op == SFU_OP) || (pI->op == ALU_SFU_OP) ) {
                                 if( sfu_pipe_avail ) {
-                                    m_shader->issue_warp(*m_sfu_out,pI,active_mask,warp_id);
+				  m_shader->issue_warp(*m_sfu_out,pI,active_mask,warp_id);
                                     issued++;
                                     issued_inst=true;
                                     warp_inst_issued = true;
@@ -1258,6 +1332,11 @@ void shader_core_ctx::writeback()
         unsigned warp_id = pipe_reg->warp_id();
         m_scoreboard->releaseRegisters( pipe_reg );
         m_warp[warp_id].dec_inst_in_pipeline();
+	//**************** TW: 04/22/16 ***************/
+	if (!m_config->tw_gpgpu_oracle_cpl){
+	  m_warp[warp_id].tw_warp_complete();
+	}
+	//*********************************************/
         warp_inst_complete(*pipe_reg);
         m_gpu->gpu_sim_insn_last_update_sid = m_sid;
         m_gpu->gpu_sim_insn_last_update = gpu_sim_cycle;
@@ -1269,6 +1348,7 @@ void shader_core_ctx::writeback()
     }
 }
 
+		 
 bool ldst_unit::shared_cycle( warp_inst_t &inst, mem_stage_stall_type &rc_fail, mem_stage_access_type &fail_type)
 {
    if( inst.space.get_type() != shared_space )
@@ -1336,6 +1416,7 @@ mem_stage_stall_type ldst_unit::process_memory_access_queue( cache_t *cache, war
 
     //const mem_access_t &access = inst.accessq_back();
     mem_fetch *mf = m_mf_allocator->alloc(inst,inst.accessq_back());
+	mf->req_criticality=m_core->get_warp_critical(mf->get_wid());
     std::list<cache_event> events;
     enum cache_request_status status = cache->access(mf->get_addr(),mf,gpu_sim_cycle+gpu_tot_sim_cycle,events);
     return process_cache_access( cache, mf->get_addr(), inst, events, mf, status );
@@ -1613,13 +1694,30 @@ ldst_unit::ldst_unit( mem_fetch_interface *icnt,
     if( !m_config->m_L1D_config.disabled() ) {
         char L1D_name[STRSIZE];
         snprintf(L1D_name, STRSIZE, "L1D_%03d", m_sid);
-        m_L1D = new l1_cache( L1D_name,
-                              m_config->m_L1D_config,
-                              m_sid,
-                              get_shader_normal_cache_id(),
-                              m_icnt,
-                              m_mf_allocator,
-                              IN_L1D_MISS_QUEUE );
+	//*****David-4/22*******************************************/
+	//Checking if CACP enabled
+	if(m_config->dj_gpgpu_with_cacp){
+	  tag_array_CACP* new_tag_array = new tag_array_CACP(m_config->m_L1D_config, m_sid, get_shader_normal_cache_id());
+	  m_L1D = (l1_cache*)new l1_cache_cacp( L1D_name,
+						m_config->m_L1D_config,
+						m_sid,
+						get_shader_normal_cache_id(),
+						m_icnt,
+						m_mf_allocator,
+						IN_L1D_MISS_QUEUE,
+						new_tag_array
+						);
+	}
+	else{
+	  //*****David-4/22*******************************************/
+	  m_L1D = new l1_cache( L1D_name,
+				m_config->m_L1D_config,
+				m_sid,
+				get_shader_normal_cache_id(),
+				m_icnt,
+				m_mf_allocator,
+				IN_L1D_MISS_QUEUE );
+	}
     }
 }
 
@@ -1921,6 +2019,9 @@ void shader_core_ctx::register_cta_thread_exit( unsigned cta_num )
       shader_CTA_count_unlog(m_sid, 1);
       printf("GPGPU-Sim uArch: Shader %d finished CTA #%d (%lld,%lld), %u CTAs running\n", m_sid, cta_num, gpu_sim_cycle, gpu_tot_sim_cycle,
              m_n_active_cta );
+      //******************* TW: 04/07/16 **********************/
+      tw_record_oracle_cpl(cta_num);
+      //*******************************************************/
       if( m_n_active_cta == 0 ) {
           assert( m_kernel != NULL );
           m_kernel->dec_running();
@@ -2846,7 +2947,7 @@ bool shd_warp_t::hardware_done() const
 }
 
 bool shd_warp_t::waiting() 
-{
+{  
     if ( functional_done() ) {
         // waiting to be initialized with a kernel
         return true;

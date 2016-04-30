@@ -60,7 +60,7 @@ stream_manager *g_stream_manager;
 static int sg_argc = 3;
 static const char *sg_argv[] = {"", "-config","gpgpusim.config"};
 
-
+//Testing
 
 static void print_simulation_time();
 
@@ -219,6 +219,9 @@ void start_sim_thread(int api)
 {
     if( g_sim_done ) {
         g_sim_done = false;
+	//****************** TW: 04/08/16 *******************/
+	g_the_gpu->tw_load_oracle_cpl();
+	//***************************************************/
         if( api == 1 ) {
            pthread_create(&g_simulation_thread,NULL,gpgpu_sim_thread_concurrent,NULL);
         } else {
@@ -243,6 +246,11 @@ void print_simulation_time()
           (unsigned)d, (unsigned)h, (unsigned)m, (unsigned)s, (unsigned)difference );
    printf("gpgpu_simulation_rate = %u (inst/sec)\n", (unsigned)(g_the_gpu->gpu_tot_sim_insn / difference) );
    printf("gpgpu_simulation_rate = %u (cycle/sec)\n", (unsigned)(gpu_tot_sim_cycle / difference) );
+   //**************** TW: 04/26/16 *******************/
+   g_the_gpu->tw_print_cpl_accuracy();
+   //**************** TW: 04/08/16 *******************/
+   g_the_gpu->tw_store_oracle_cpl();
+   //*************************************************/
    fflush(stdout);
 }
 

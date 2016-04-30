@@ -360,12 +360,14 @@ void shader_core_config::reg_options(class OptionParser * opp)
     option_parser_register(opp, "-gpgpu_num_mem_units", OPT_INT32, &gpgpu_num_mem_units,
                             "Number if ldst units (default=1) WARNING: not hooked up to anything",
                              "1");
+    //*************** TW: 04/22/16 ***************/
     option_parser_register(opp, "-gpgpu_scheduler", OPT_CSTR, &gpgpu_scheduler_string,
-                                "Scheduler configuration: < lrr | gto | two_level_active > "
+                                "Scheduler configuration: < lrr | gto | two_level_active | cawa> "
                                 "If two_level_active:<num_active_warps>:<inner_prioritization>:<outer_prioritization>"
                                 "For complete list of prioritization values see shader.h enum scheduler_prioritization_type"
                                 "Default: gto",
                                  "gto");
+    //********************************************/
 }
 
 void gpgpu_sim_config::reg_options(option_parser_t opp)
@@ -374,6 +376,9 @@ void gpgpu_sim_config::reg_options(option_parser_t opp)
     m_shader_config.reg_options(opp);
     m_memory_config.reg_options(opp);
     power_config::reg_options(opp);
+    //************* TW: 04/25/16 **************/
+    m_shader_config.tw_cawa_reg_options(opp);
+    //*****************************************/
    option_parser_register(opp, "-gpgpu_max_cycle", OPT_INT32, &gpu_max_cycle_opt, 
                "terminates gpu simulation early (0 = no limit)",
                "0");
@@ -475,6 +480,9 @@ void gpgpu_sim::launch( kernel_info_t *kinfo )
        }
    }
    assert(n < m_running_kernels.size());
+   //********************* TW: 04/08/16 ******************/
+   m_shader_stats->tw_launch_kernel(kinfo->get_uid(), kinfo->num_blocks(), kinfo->threads_per_cta() / m_shader_config->warp_size);  // Initialize the critical_warp_info array
+   //*****************************************************/
 }
 
 bool gpgpu_sim::can_start_kernel()
@@ -917,7 +925,16 @@ void gpgpu_sim::gpu_print_stat()
    core_cache_stats.print_stats(stdout, "Total_core_cache_stats_breakdown");
    shader_print_scheduler_stat( stdout, false );
 
+   //******************* TW: 04/30/16 *****************/
+   printf("\nCACP Stats\n");
+   for(unsigned i=0; i<m_config.num_cluster(); i++){
+     if (m_shader_config->dj_gpgpu_with_cacp){
+       m_cluster[i]->print_CACP_stats();
+     }
+   }
+   //**************************************************/
    m_shader_stats->print(stdout);
+
 #ifdef GPGPUSIM_POWER_MODEL
    if(m_config.g_power_simulation_enabled){
 	   m_gpgpusim_wrapper->print_power_kernel_stats(gpu_sim_cycle, gpu_tot_sim_cycle, gpu_tot_sim_insn + gpu_sim_insn, kernel_info_str, true );
@@ -1073,6 +1090,10 @@ void shader_core_ctx::issue_block2core( kernel_info_t &kernel )
       padded_cta_size = ((cta_size/m_config->warp_size)+1)*(m_config->warp_size);
     unsigned start_thread = free_cta_hw_id * padded_cta_size;
     unsigned end_thread  = start_thread +  cta_size;
+
+    //*********************** TW: 04/07/16 ************************/
+    tw_cta_num_in_kernel[free_cta_hw_id] = kernel.tw_next_cta_num();
+    //*************************************************************/
 
     // reset the microarchitecture state of the selected hardware thread and warp contexts
     reinit(start_thread, end_thread,false);
@@ -1400,4 +1421,3 @@ simt_core_cluster * gpgpu_sim::getSIMTCluster()
 {
    return *m_cluster;
 }
-

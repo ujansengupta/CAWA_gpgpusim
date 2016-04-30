@@ -155,7 +155,7 @@ void tag_array::init( int core_id, int type_id )
     m_type_id = type_id;
 }
 
-enum cache_request_status tag_array::probe( new_addr_type addr, unsigned &idx ) const {
+ enum cache_request_status tag_array::probe( new_addr_type addr, unsigned &idx ) const {
     //assert( m_config.m_write_policy == READ_ONLY );
     unsigned set_index = m_config.set_index(addr);
     new_addr_type tag = m_config.tag(addr);
@@ -168,41 +168,42 @@ enum cache_request_status tag_array::probe( new_addr_type addr, unsigned &idx ) 
 
     // check for hit or pending hit
     for (unsigned way=0; way<m_config.m_assoc; way++) {
-        unsigned index = set_index*m_config.m_assoc+way;
-        cache_block_t *line = &m_lines[index];
-        if (line->m_tag == tag) {
-            if ( line->m_status == RESERVED ) {
-                idx = index;
-                return HIT_RESERVED;
-            } else if ( line->m_status == VALID ) {
-                idx = index;
-                return HIT;
-            } else if ( line->m_status == MODIFIED ) {
-                idx = index;
-                return HIT;
-            } else {
-                assert( line->m_status == INVALID );
-            }
-        }
-        if (line->m_status != RESERVED) {
-            all_reserved = false;
-            if (line->m_status == INVALID) {
-                invalid_line = index;
-            } else {
-                // valid line : keep track of most appropriate replacement candidate
-                if ( m_config.m_replacement_policy == LRU ) {
-                    if ( line->m_last_access_time < valid_timestamp ) {
-                        valid_timestamp = line->m_last_access_time;
-                        valid_line = index;
-                    }
-                } else if ( m_config.m_replacement_policy == FIFO ) {
-                    if ( line->m_alloc_time < valid_timestamp ) {
-                        valid_timestamp = line->m_alloc_time;
-                        valid_line = index;
-                    }
-                }
-            }
-        }
+      unsigned index = set_index*m_config.m_assoc+way;
+      cache_block_t *line = &m_lines[index];
+      if (line->m_tag == tag) {
+	if ( line->m_status == RESERVED ) {
+	  idx = index;
+	  return HIT_RESERVED;
+	  
+	} else if ( line->m_status == VALID ) {
+	  idx = index;
+	  return HIT;
+	} else if ( line->m_status == MODIFIED ) {
+	  idx = index;
+	  return HIT;
+	} else {
+	  assert( line->m_status == INVALID );
+	}
+      }
+      if (line->m_status != RESERVED) {
+	all_reserved = false;
+	if (line->m_status == INVALID) {
+	  invalid_line = index;
+	} else {
+	  // valid line : keep track of most appropriate replacement candidate
+	  if ( m_config.m_replacement_policy == LRU ) {
+	    if ( line->m_last_access_time < valid_timestamp ) {
+	      valid_timestamp = line->m_last_access_time;
+	      valid_line = index;
+	    }
+	  } else if ( m_config.m_replacement_policy == FIFO ) {
+	    if ( line->m_alloc_time < valid_timestamp ) {
+	      valid_timestamp = line->m_alloc_time;
+	      valid_line = index;
+	    }
+	  }
+	}
+      }
     }
     if ( all_reserved ) {
         assert( m_config.m_alloc_policy == ON_MISS ); 
@@ -214,10 +215,9 @@ enum cache_request_status tag_array::probe( new_addr_type addr, unsigned &idx ) 
     } else if ( valid_line != (unsigned)-1) {
         idx = valid_line;
     } else abort(); // if an unreserved block exists, it is either invalid or replaceable 
-
+	//	check and add this follwoing to probe. COver all
     return MISS;
 }
-
 enum cache_request_status tag_array::access( new_addr_type addr, unsigned time, unsigned &idx )
 {
     bool wb=false;
@@ -236,14 +236,18 @@ enum cache_request_status tag_array::access( new_addr_type addr, unsigned time, 
     case HIT_RESERVED: 
         m_pending_hit++;
     case HIT: 
-        m_lines[idx].m_last_access_time=time; 
+		
+		m_lines[idx].m_last_access_time=time; 
         break;
     case MISS:
         m_miss++;
+	
+		
         shader_cache_access_log(m_core_id, m_type_id, 1); // log cache misses
         if ( m_config.m_alloc_policy == ON_MISS ) {
             if( m_lines[idx].m_status == MODIFIED ) {
                 wb = true;
+				
                 evicted = m_lines[idx];
             }
             m_lines[idx].allocate( m_config.tag(addr), m_config.block_addr(addr), time );

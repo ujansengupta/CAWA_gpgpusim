@@ -85,10 +85,14 @@ public:
    bool m_active; 
 };
 
+class shader_core_ctx;
+class shader_core_config;
+class shader_core_stats;
+
 class shd_warp_t {
 public:
-    shd_warp_t( class shader_core_ctx *shader, unsigned warp_size) 
-        : m_shader(shader), m_warp_size(warp_size)
+ shd_warp_t( class shader_core_ctx *shader, unsigned warp_size) 
+   : m_shader(shader), m_warp_size(warp_size)
     {
         m_stores_outstanding=0;
         m_inst_in_pipeline=0;
@@ -108,12 +112,26 @@ public:
         m_last_fetch=0;
         m_next=0;
         m_inst_at_barrier=NULL;
+	//*********** TW: 04/20/16 *************/
+	tw_cpl_oracle = 0;
+	tw_cpl_actual = 0;
+	tw_nInst = 0;
+        tw_nStall = 0;
+        tw_warp_entered_cycle = 0;
+	tw_warp_completed_cycle = 0;
+        tw_num_completed_inst = 0;
+        tw_last_schedule_cycle = 0;
+	//**************************************/
+	criticality = false;
     }
     void init( address_type start_pc,
                unsigned cta_id,
                unsigned wid,
                const std::bitset<MAX_WARP_SIZE> &active,
-               unsigned dynamic_warp_id )
+               unsigned dynamic_warp_id,
+	       //******* TW: 04/20/16 ********/
+	       int oracle_CPL )
+    //******** TW: 04/20/16*************/
     {
         m_cta_id=cta_id;
         m_warp_id=wid;
@@ -121,9 +139,20 @@ public:
         m_next_pc=start_pc;
         assert( n_completed >= active.count() );
         assert( n_completed <= m_warp_size);
-        n_completed   -= active.count(); // active threads are not yet completed
+        n_completed -= active.count(); // active threads are not yet completed
         m_active_threads = active;
         m_done_exit=false;
+	//*********** TW: 04/20/16 *************/
+        tw_cpl_oracle = oracle_CPL;
+        tw_cpl_actual = 0;
+	tw_nInst = 0;
+	tw_nStall = 0;
+	tw_warp_entered_cycle = 0;
+	tw_warp_completed_cycle = 0;
+	tw_num_completed_inst = 0;
+	tw_last_schedule_cycle = 0;
+        //**************************************/ 
+	criticality = false;
     }
 
     bool functional_done() const;
@@ -227,6 +256,30 @@ public:
     unsigned get_dynamic_warp_id() const { return m_dynamic_warp_id; }
     unsigned get_warp_id() const { return m_warp_id; }
 
+    //*************** TW: 04/20/16 *****************/
+    void tw_set_oracle_CPL(int cpl) { tw_cpl_oracle = cpl; }
+    float tw_get_CPL() const;
+    int tw_get_oracle_CPL() const { return tw_cpl_oracle; }
+    //*************** TW: 04/20/16 *****************/
+    void tw_warp_enter(unsigned cycle, unsigned ninst);
+    void tw_warp_issue(unsigned cycle, address_type npc, unsigned isize);
+    void tw_warp_complete();
+    void tw_warp_exit(unsigned cycle);
+    void tw_cpl_calculate(bool avg_cpi, bool stall, unsigned cycle);
+    unsigned tw_get_warp_execution_cycles() const {
+      if (tw_warp_completed_cycle <= tw_warp_entered_cycle){
+	printf("\nTW: %d,%d, Cycles: %d %d\n", m_cta_id, m_warp_id, tw_warp_entered_cycle, tw_warp_completed_cycle);
+	assert(0);
+      }
+      assert(tw_warp_entered_cycle < tw_warp_completed_cycle);
+      return tw_warp_completed_cycle - tw_warp_entered_cycle;
+    }
+    //**********************************************/
+     //************************************************/
+     //David: 04/21
+     //warp criticality divided by max warp criticality in this shader core, set to a boolean
+	bool criticality;
+   //************************************************/
 private:
     static const unsigned IBUFFER_SIZE=2;
     class shader_core_ctx *m_shader;
@@ -260,6 +313,21 @@ private:
 
     unsigned m_stores_outstanding; // number of store requests sent but not yet acknowledged
     unsigned m_inst_in_pipeline;
+
+    //**************** TW: 04/20/16 ******************/
+    bool tw_with_oracle_cpl;
+    int tw_cpl_oracle;
+    float tw_cpl_actual;
+    //**************** TW: 04/22/16 ******************/
+    int tw_nInst;
+    unsigned tw_nStall;
+    // For avg CPI
+    unsigned tw_warp_entered_cycle;
+    unsigned tw_warp_completed_cycle;
+    unsigned tw_num_completed_inst;
+    // For nStall
+    unsigned tw_last_schedule_cycle;
+    //************************************************/    
 };
 
 
@@ -272,9 +340,6 @@ typedef std::bitset<WARP_PER_CTA_MAX> warp_set_t;
 
 int register_bank(int regnum, int wid, unsigned num_banks, unsigned bank_warp_shift);
 
-class shader_core_ctx;
-class shader_core_config;
-class shader_core_stats;
 
 enum scheduler_prioritization_type
 {
@@ -285,6 +350,14 @@ enum scheduler_prioritization_type
     SCHEDULER_PRIORITIZATION_GTY, // Greedy Then Youngest
     SCHEDULER_PRIORITIZATION_OLDEST, // Oldest First
     SCHEDULER_PRIORITIZATION_YOUNGEST, // Youngest First
+    
+    //---------US - 4/22-----------//
+    SCHEDULER_PRIORITIZATION_CAWS,  //Criticality Aware
+    //---------US - 4/22-----------//
+    
+    //---------US - 4/30-----------//
+    SCHEDULER_PRIORITIZATION_GCAWS //Criticality Aware and Greedy
+    //---------US - 4/30-----------//
 };
 
 // Each of these corresponds to a string value in the gpgpsim.config file
@@ -295,11 +368,26 @@ enum concrete_scheduler
     CONCRETE_SCHEDULER_GTO,
     CONCRETE_SCHEDULER_TWO_LEVEL_ACTIVE,
     CONCRETE_SCHEDULER_WARP_LIMITING,
-    NUM_CONCRETE_SCHEDULERS
+    NUM_CONCRETE_SCHEDULERS,
+    //---------US - 4/22-----------//
+    CONCRETE_SCHEDULER_CAWS,  //Criticality Aware 
+    //---------US - 4/22-----------//
+    
+    //---------US - 4/30-----------//
+    CONCRETE_SCHEDULER_GCAWS  //Criticality Aware and Greedy
+    //---------US - 4/30-----------//
 };
 
 class scheduler_unit { //this can be copied freely, so can be used in std containers.
 public:
+
+    //--------------US--------------------//
+    
+    int count,flag;
+    scheduler_unit();
+        
+    //--------------US--------------------//
+    
     scheduler_unit(shader_core_stats* stats, shader_core_ctx* shader, 
                    Scoreboard* scoreboard, simt_stack** simt, 
                    std::vector<shd_warp_t>* warp, 
@@ -326,6 +414,7 @@ public:
 
     // These are some common ordering fucntions that the
     // higher order schedulers can take advantage of
+    
     template < typename T >
     void order_lrr( typename std::vector< T >& result_list,
                     const typename std::vector< T >& input_list,
@@ -342,6 +431,7 @@ public:
         ORDERED_PRIORITY_FUNC_ONLY,
         NUM_ORDERING,
     };
+    
     template < typename U >
     void order_by_priority( std::vector< U >& result_list,
                             const typename std::vector< U >& input_list,
@@ -349,8 +439,13 @@ public:
                             unsigned num_warps_to_add,
                             OrderingType age_ordering,
                             bool (*priority_func)(U lhs, U rhs) );
+                            
     static bool sort_warps_by_oldest_dynamic_id(shd_warp_t* lhs, shd_warp_t* rhs);
 
+    //---------US - 4/22-----------//
+    //    static bool sort_warps_by_criticality(shd_warp_t* lhs, shd_warp_t* rhs);
+    //---------US - 4/22-----------//
+    
     // Derived classes can override this function to populate
     // m_supervised_warps with their scheduling policies
     virtual void order_warps() = 0;
@@ -360,6 +455,7 @@ protected:
                                     unsigned num_issued,
                                     const std::vector< shd_warp_t* >::const_iterator& prioritized_iter );
     inline int get_sid() const;
+
 protected:
     shd_warp_t& warp(int i);
 
@@ -422,6 +518,57 @@ public:
 
 };
 
+
+//---------US - 4/22-----------//
+
+class caws_scheduler : public scheduler_unit {
+public:
+	caws_scheduler ( shader_core_stats* stats, shader_core_ctx* shader,
+                    Scoreboard* scoreboard, simt_stack** simt,
+                    std::vector<shd_warp_t>* warp,
+                    register_set* sp_out,
+                    register_set* sfu_out,
+                    register_set* mem_out,
+                    int id )
+	: scheduler_unit ( stats, shader, scoreboard, simt, warp, sp_out, sfu_out, mem_out, id ){}
+	virtual ~caws_scheduler () {}
+	virtual void order_warps ();
+    virtual void done_adding_supervised_warps() {
+        m_last_supervised_issued = m_supervised_warps.end();		//Check whether to keep it as m-sup_warps.begin or end//
+    }
+    void order_by_priority(std::vector<shd_warp_t*>& result_list, 
+			   const std::vector<shd_warp_t*>& input_list,
+			   const std::vector<shd_warp_t*>::const_iterator& last_issued_from_input,
+			   unsigned num_warps_to_add);
+    void sort_warps(std::vector<shd_warp_t*>& temp);
+};
+
+//---------US - 4/22-----------//
+
+//---------US - 4/30-----------//
+class gcaws_scheduler : public scheduler_unit {
+public:
+	gcaws_scheduler ( shader_core_stats* stats, shader_core_ctx* shader,
+                    Scoreboard* scoreboard, simt_stack** simt,
+                    std::vector<shd_warp_t>* warp,
+                    register_set* sp_out,
+                    register_set* sfu_out,
+                    register_set* mem_out,
+                    int id )
+	: scheduler_unit ( stats, shader, scoreboard, simt, warp, sp_out, sfu_out, mem_out, id ){}
+	virtual ~gcaws_scheduler () {}
+	virtual void order_warps ();
+    virtual void done_adding_supervised_warps() {
+        m_last_supervised_issued = m_supervised_warps.end();		//Check whether to keep it as m-sup_warps.begin or end//
+    }
+    void order_by_priority(std::vector<shd_warp_t*>& result_list, 
+			   const std::vector<shd_warp_t*>& input_list,
+			   const std::vector<shd_warp_t*>::const_iterator& last_issued_from_input,
+			   unsigned num_warps_to_add);
+    void sort_warps(std::vector<shd_warp_t*>& temp);
+};
+
+//---------US - 4/30-----------//
 
 class two_level_active_scheduler : public scheduler_unit {
 public:
@@ -1119,6 +1266,9 @@ public:
     void get_L1C_sub_stats(struct cache_sub_stats &css) const;
     void get_L1T_sub_stats(struct cache_sub_stats &css) const;
 
+    //****************** TW: 04/30/16 *****************/
+    void print_CACP_stats() const;
+    //*************************************************/
 protected:
     ldst_unit( mem_fetch_interface *icnt,
                shader_core_mem_fetch_allocator *mf_allocator,
@@ -1254,6 +1404,9 @@ struct shader_core_config : public core_config
         m_valid = true;
     }
     void reg_options(class OptionParser * opp );
+    //************** TW: 04/25/16 **************/
+    void tw_cawa_reg_options(class OptionParser * opp);
+    //******************************************/
     unsigned max_cta( const kernel_info_t &k ) const;
     unsigned num_shader() const { return n_simt_clusters*n_simt_cores_per_cluster; }
     unsigned sid_to_cluster( unsigned sid ) const { return sid / n_simt_cores_per_cluster; }
@@ -1282,11 +1435,23 @@ struct shader_core_config : public core_config
     mutable l1d_cache_config m_L1D_config;
 
     bool gmem_skip_L1D; // on = global memory access always skip the L1 cache 
-    
     bool gpgpu_dwf_reg_bankconflict;
 
     int gpgpu_num_sched_per_core;
     int gpgpu_max_insn_issue_per_warp;
+
+    //************* TW: 04/26/16 *************/
+    bool tw_gpgpu_oracle_cpl; // on = generate oracle CPL for 1st run and use the info at 2nd run
+    char* tw_gpgpu_oracle_scheduler_string; // oracle CPL should be get from which previous scheduler info
+    bool tw_oracle_cpl_exec_cycles; // on = use execution cycles from enter to complete, off = use execution cycle distribution
+    bool tw_actual_cpl_static_ninst; // on = use static number of inst, off = use zero
+    bool tw_actual_cpl_real_cpi; // on = use average cpi, off = assume cpi for all warps are the same (1.0)
+    bool tw_actual_cpl_stall; // on = consider stall cycles
+    bool tw_gpgpu_load_oracle_counter; // on = load oracle counter
+    bool tw_gpgpu_store_oracle_counter; // on = store oracle counter
+    bool tw_calculate_cpl_accuracy;  // on = calculate cpl accuracy for the actual counter
+    bool dj_gpgpu_with_cacp; // on = use cacp; off = no cacp
+    //****************************************/
 
     //op collector
     int gpgpu_operand_collector_num_units_sp;
@@ -1452,6 +1617,17 @@ public:
         m_non_rf_operands=(unsigned*) calloc(config->num_shader(),sizeof(unsigned));
         m_n_diverge = (unsigned*) calloc(config->num_shader(),sizeof(unsigned));
         shader_cycle_distro = (unsigned*) calloc(config->warp_size+3, sizeof(unsigned));
+	//******************* TW: 04/07/16 *********************/
+	tw_warp_cta_cycle_dist = (int**) calloc(config->num_shader(), sizeof(int*));
+	for (unsigned i = 0; i < config->num_shader(); i++){
+	  tw_warp_cta_cycle_dist[i] = (int*)calloc(config->max_warps_per_shader, sizeof(int));
+	}
+	tw_num_launched_kernels = 0;
+	tw_with_oracle_cpl = false;
+	//******************* TW: 04/26/16 ********************/
+	tw_accurate_cpl_for_accuracy = 0;
+	tw_total_cpl_for_accuracy = 0;
+	//*****************************************************/
         last_shader_cycle_distro = (unsigned*) calloc(m_config->warp_size+3, sizeof(unsigned));
 
         n_simt_to_mem = (long *)calloc(config->num_shader(), sizeof(long));
@@ -1486,6 +1662,18 @@ public:
     void visualizer_print( gzFile visualizer_file );
 
     void print( FILE *fout ) const;
+    
+    //********************* TW: 04/07/16 *******************/
+    void tw_launch_kernel(unsigned kid, unsigned total_cta, unsigned num_warps_per_cta);
+    void tw_store_oracle_cpl(FILE* fp) const;
+    void tw_load_oracle_cpl(FILE* fp);
+    bool tw_if_with_oracle_cpl() const{
+      return tw_with_oracle_cpl;
+    }
+    int tw_get_oracle_CPL_counter(unsigned kernel_id, unsigned block_num, unsigned warp_id_within_block) const;
+    //********************* TW: 04/26/16 *******************/
+    void tw_print_cpl_accuracy(FILE* fp) const;
+    //******************************************************/
 
     const std::vector< std::vector<unsigned> >& get_dynamic_warp_issue() const
     {
@@ -1509,6 +1697,16 @@ private:
     std::vector< std::vector<unsigned> > m_shader_warp_slot_issue_distro;
     std::vector<unsigned> m_last_shader_warp_slot_issue_distro;
 
+    //***************** TW: 04/08/16 ************/
+    std::vector<int**> tw_cpl_actual;
+    int ***tw_cpl_oracle;
+    int **tw_warp_cta_cycle_dist;
+    unsigned tw_num_launched_kernels;
+    bool tw_with_oracle_cpl;
+    // **************** TW: 04/26/16 ************/
+    unsigned tw_total_cpl_for_accuracy;
+    unsigned tw_accurate_cpl_for_accuracy;
+    //*******************************************/
     friend class power_stat_t;
     friend class shader_core_ctx;
     friend class ldst_unit;
@@ -1541,7 +1739,7 @@ public:
     
     mem_fetch *alloc( const warp_inst_t &inst, const mem_access_t &access ) const
     {
-        warp_inst_t inst_copy = inst;
+      warp_inst_t inst_copy = inst;
         mem_fetch *mf = new mem_fetch(access, 
                                       &inst_copy, 
                                       access.is_write()?WRITE_PACKET_SIZE:READ_PACKET_SIZE,
@@ -1571,6 +1769,12 @@ public:
 
 // used by simt_core_cluster:
     // modifiers
+    //************************************************/
+    //David-4/24/2016-Function to calculate per warp criticality, to be called every time tw's counters are refereshed.
+    void calc_warp_criticality();
+    bool get_warp_critical(unsigned warpid);
+    //*****David-4/24*******************************************/
+	    
     void cycle();
     void reinit(unsigned start_thread, unsigned end_thread, bool reset_not_completed );
     void issue_block2core( class kernel_info_t &kernel );
@@ -1627,6 +1831,10 @@ public:
     void get_L1T_sub_stats(struct cache_sub_stats &css) const;
 
     void get_icnt_power_stats(long &n_simt_to_mem, long &n_mem_to_simt) const;
+
+    //**************** TW: 04/30/16 ****************/
+    void print_CACP_stats() const;
+    //**********************************************/
 
 // debug:
     void display_simt_state(FILE *fout, int mask ) const;
@@ -1736,13 +1944,16 @@ public:
 	 void inc_simt_to_mem(unsigned n_flits){ m_stats->n_simt_to_mem[m_sid] += n_flits; }
 	 bool check_if_non_released_reduction_barrier(warp_inst_t &inst);
 
-	private:
-	 unsigned inactive_lanes_accesses_sfu(unsigned active_count,double latency){
+	 //************** TW: 04/22/16 *************/
+	 bool tw_if_use_oracle_cpl() const;
+	 //*****************************************/
+ private:
+    unsigned inactive_lanes_accesses_sfu(unsigned active_count,double latency){
       return  ( ((32-active_count)>>1)*latency) + ( ((32-active_count)>>3)*latency) + ( ((32-active_count)>>3)*latency);
-	 }
-	 unsigned inactive_lanes_accesses_nonsfu(unsigned active_count,double latency){
+    }
+    unsigned inactive_lanes_accesses_nonsfu(unsigned active_count,double latency){
       return  ( ((32-active_count)>>1)*latency);
-	 }
+    }
 
     int test_res_bus(int latency);
     void init_warps(unsigned cta_id, unsigned start_thread, unsigned end_thread);
@@ -1760,6 +1971,21 @@ public:
     void issue_warp( register_set& warp, const warp_inst_t *pI, const active_mask_t &active_mask, unsigned warp_id );
     void func_exec_inst( warp_inst_t &inst );
 
+    //******************* TW: 04/07/16 ****************/
+    unsigned tw_cta_num_in_kernel[MAX_CTA_PER_SHADER];
+    void tw_get_start_end_warp_id(unsigned* start_warp_id, unsigned* end_warp_id, unsigned cta_num) const;
+    void tw_rank_oracle_cpl( unsigned cta_num, int** ranked_oracle_cpl ) const;
+    void tw_record_oracle_cpl( unsigned cta_num );
+    //******************* TW: 04/22/16 ****************/
+    std::vector<float> tw_get_current_CPL_counters() const;
+    void tw_print_CPL_counters(unsigned start_id, unsigned end_id) const;
+    void tw_oracle_CPL_sanity_check(unsigned warp_id, int actual_counter) const;
+    void tw_calculate_cpl(unsigned cycle);
+    unsigned tw_get_static_ninst(unsigned warp_id);
+    address_type tw_calculate_npc_per_warp(unsigned warp_id);
+    //******************* TW: 04/26/16 ****************/
+    void tw_calculate_cpl_accuracy() const;
+    //*************************************************/
      // Returns numbers of addresses in translated_addrs
     unsigned translate_local_memaddr( address_type localaddr, unsigned tid, unsigned num_shader, unsigned datasize, new_addr_type* translated_addrs );
 
@@ -1768,7 +1994,9 @@ public:
     void execute();
     
     void writeback();
-    
+ 
+	
+		
     // used in display_pipeline():
     void dump_warp_state( FILE *fout ) const;
     void print_stage(unsigned int stage, FILE *fout) const;
@@ -1782,7 +2010,7 @@ public:
     const memory_config *m_memory_config;
     class simt_core_cluster *m_cluster;
 
-    // statistics 
+    // statistics
     shader_core_stats *m_stats;
 
     // CTA scheduling / hardware thread allocation
@@ -1878,6 +2106,9 @@ public:
 
     void get_icnt_stats(long &n_simt_to_mem, long &n_mem_to_simt) const;
 
+    //**************** TW: 04/30/16 ****************/
+    void print_CACP_stats() const;
+    //**********************************************/
 private:
     unsigned m_cluster_id;
     gpgpu_sim *m_gpu;

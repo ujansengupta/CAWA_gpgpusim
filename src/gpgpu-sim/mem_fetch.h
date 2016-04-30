@@ -49,6 +49,12 @@ enum mf_type {
 
 class mem_fetch {
 public:
+ //*****David-4/24*******************************************/
+   //adding criticality to mem_fetch;
+   bool req_criticality;
+   
+   //*****David-4/24*******************************************/
+   
     mem_fetch( const mem_access_t &access, 
                const warp_inst_t *inst,
                unsigned ctrl_size, 
@@ -107,7 +113,7 @@ public:
    address_type get_pc() const { return m_inst.empty()?-1:m_inst.pc; }
    const warp_inst_t &get_inst() { return m_inst; }
    enum mem_fetch_status get_status() const { return m_status; }
-
+   
    const memory_config *get_mem_config(){return m_mem_config;}
 
    unsigned get_num_flits(bool simt_to_mem);
@@ -121,7 +127,7 @@ private:
    // where is this request now?
    enum mem_fetch_status m_status;
    unsigned long long m_status_change;
-
+  
    // request type, address, size, mask
    mem_access_t m_access;
    unsigned m_data_size; // how much data is being written
@@ -142,6 +148,7 @@ private:
 
    const class memory_config *m_mem_config;
    unsigned icnt_flit_size;
+   
 };
 
 #endif
