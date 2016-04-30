@@ -52,7 +52,6 @@ void cawa_scheduler::order_by_priority(std::vector<shd_warp_t*>& result_list,
     result_list.push_back( *iter );
   }
 }
-
 void cawa_scheduler::sort_warps(std::vector<shd_warp_t*>& temp){
   for (unsigned i = 0; i < temp.size()-1; i++){
     unsigned jMax = i;
@@ -68,7 +67,6 @@ void cawa_scheduler::sort_warps(std::vector<shd_warp_t*>& temp){
     }
   }
 }
-
 bool sort_warps_by_criticality(shd_warp_t* lhs, shd_warp_t* rhs)
 {
   /*
