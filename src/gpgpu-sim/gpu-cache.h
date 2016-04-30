@@ -358,7 +358,7 @@ public:
     ~tag_array();
 
     enum cache_request_status probe( new_addr_type addr, unsigned &idx ) const;
-    virtual enum cache_request_status probe( new_addr_type addr, unsigned &idx, bool critical, unsigned pc) {assert(0); return MISS; };
+    virtual enum cache_request_status probe( new_addr_type addr, unsigned &idx, bool critical, unsigned pc, bool &critical_eviction, bool &zero_reuse, bool &correct_prediction) {assert(0); return MISS; };
     enum cache_request_status access( new_addr_type addr, unsigned time, unsigned &idx );
     enum cache_request_status access( new_addr_type addr, unsigned time, unsigned &idx, bool &wb, cache_block_t &evicted );
 
@@ -420,7 +420,7 @@ class tag_array_CACP :public tag_array{
 		for(int i=0;i<256;i++)
 			CCBP[i]=1;//Currently setting to 1. need to experiment for better values.
 	}
-	 virtual enum cache_request_status probe( new_addr_type addr, unsigned &idx, bool critical, unsigned pc);
+	virtual enum cache_request_status probe( new_addr_type addr, unsigned &idx, bool critical, unsigned pc, bool &critical_eviction, bool &zero_reuse, bool &correct_prediction);
 	 void cacp_hit(bool critical, unsigned &idx);
 	 void cacp_eviction(unsigned &idx, unsigned set_index);
 	protected:
@@ -819,6 +819,9 @@ public:
                                               mem_fetch *mf,
                                               unsigned time,
                                               std::list<cache_event> &events );
+    //************* TW: 04/30/16 **************/
+    virtual void print_CACP_stats() const {assert(0);};
+    //*****************************************/
 protected:
     data_cache( const char *name,
                 cache_config &config,
@@ -1003,10 +1006,23 @@ protected:
 
 //*****David-4/24*******************************************/
 //CACP version of L1 cache
-class l1_cache_cacp : public data_cache {
+class cache_cacp_stats {
 public:
-	
-	
+ cache_cacp_stats(): dj_total_crit_access(0), dj_total_crit_hit(0), dj_total_hit(0), dj_total_access(0), dj_zero_reuses(0), dj_critical_evictions(0), dj_CCBP_correct(0) {};
+  
+  void dj_record_stats(bool critical, enum cache_request_status status, bool critical_eviciton, bool zero_reuse, bool correct);
+  void dj_print_stats() const;
+private:
+  unsigned dj_total_crit_access;
+  unsigned dj_total_crit_hit;
+  unsigned dj_total_hit;
+  unsigned dj_total_access;
+  unsigned dj_zero_reuses;
+  unsigned dj_critical_evictions;
+  unsigned dj_CCBP_correct;
+};
+class l1_cache_cacp : public data_cache {
+public:	
     l1_cache_cacp(const char *name, cache_config &config,
             int core_id, int type_id, mem_fetch_interface *memport,
             mem_fetch_allocator *mfcreator, enum mem_fetch_status status )
@@ -1020,6 +1036,8 @@ public:
                 unsigned time,
                 std::list<cache_event> &events );
 
+    virtual void print_CACP_stats() const;
+
     //protected:
     l1_cache_cacp( const char *name,
               cache_config &config,
@@ -1031,9 +1049,13 @@ public:
               tag_array_CACP* new_tag_array )
     : data_cache( name,
                   config,
-                  core_id,type_id,memport,mfcreator,status, new_tag_array, L1_WR_ALLOC_R, L1_WRBK_ACC ){}
+                  core_id,type_id,memport,mfcreator,status, new_tag_array, L1_WR_ALLOC_R, L1_WRBK_ACC )
+      {
+	m_cacp_stats = new cache_cacp_stats;
+      }
    
-
+ private:
+    cache_cacp_stats* m_cacp_stats;
 };
 //*****David-4/24*******************************************/
 /// Models second level shared cache with global write-back

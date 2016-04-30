@@ -1237,6 +1237,9 @@ public:
     void get_L1C_sub_stats(struct cache_sub_stats &css) const;
     void get_L1T_sub_stats(struct cache_sub_stats &css) const;
 
+    //****************** TW: 04/30/16 *****************/
+    void print_CACP_stats() const;
+    //*************************************************/
 protected:
     ldst_unit( mem_fetch_interface *icnt,
                shader_core_mem_fetch_allocator *mf_allocator,
@@ -1800,6 +1803,9 @@ public:
 
     void get_icnt_power_stats(long &n_simt_to_mem, long &n_mem_to_simt) const;
 
+    //**************** TW: 04/30/16 ****************/
+    void print_CACP_stats() const;
+    //**********************************************/
 
 // debug:
     void display_simt_state(FILE *fout, int mask ) const;
@@ -2071,6 +2077,9 @@ public:
 
     void get_icnt_stats(long &n_simt_to_mem, long &n_mem_to_simt) const;
 
+    //**************** TW: 04/30/16 ****************/
+    void print_CACP_stats() const;
+    //**********************************************/
 private:
     unsigned m_cluster_id;
     gpgpu_sim *m_gpu;

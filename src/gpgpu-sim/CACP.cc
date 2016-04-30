@@ -10,9 +10,21 @@
  ****  04/07/16                                       ****
  *********************************************************/
 #include "shader.h"
-
+#define CRIT_PCT 0.75
+#define PARTITION_PCT 50
+void simt_core_cluster::print_CACP_stats() const
+{
+  for( unsigned i=0; i < m_config->n_simt_cores_per_cluster; i++ ){
+    printf("Cluster %d:\n", i);
+    m_core[i]->print_CACP_stats();
+  }
+}
+void ldst_unit::print_CACP_stats() const
+{
+  m_L1D->print_CACP_stats();
+}
 //***************** class shader_core_ctx *********************/
- void shader_core_ctx:: calc_warp_criticality()
+ void shader_core_ctx::calc_warp_criticality()
  {
    int max=0;
    //need to add check for first run.
@@ -20,7 +32,7 @@
      if(max<m_warp.at(index).tw_get_CPL())
        max=m_warp.at(index).tw_get_CPL();
    for (long index=0; index<(long)m_warp.size(); ++index) 
-     if(m_warp.at(index).tw_get_CPL()/max>0.75)
+     if(m_warp.at(index).tw_get_CPL()/max>CRIT_PCT)
        m_warp.at(index).criticality=true;
      else
        m_warp.at(index).criticality=false;
@@ -31,6 +43,10 @@
 	 return m_warp.at(warpid).criticality;
  }
 
+void shader_core_ctx::print_CACP_stats() const {
+  printf("Core %d:\n", m_sid);
+  m_ldst_unit->print_CACP_stats();
+}
  
 //*****David-4/24*******************************************/
 //adding cacp access copy
@@ -44,18 +60,54 @@ l1_cache_cacp::access( new_addr_type addr,
   bool wr = mf->get_is_write();
   new_addr_type block_addr = m_config.block_addr(addr);
   unsigned cache_index = (unsigned)-1;
+  bool zero_reuse = false, critical_eviction = false, correct_prediction = false;
   enum cache_request_status probe_status
-    = m_tag_array->probe( block_addr, cache_index , mf->req_criticality, mf->get_pc());  
+    = m_tag_array->probe( block_addr, cache_index , mf->req_criticality, mf->get_pc(), critical_eviction, zero_reuse, correct_prediction);
   enum cache_request_status access_status
     = process_tag_probe( wr, probe_status, addr, cache_index, mf, time, events );
   m_stats.inc_stats(mf->get_access_type(),
 		    m_stats.select_stats_status(probe_status, access_status));
-    return access_status;
-    // return data_cache::access( addr, mf, time, events );  
+  m_cacp_stats->dj_record_stats(mf->req_criticality, probe_status, critical_eviction, zero_reuse, correct_prediction);
+  return access_status;
 }
-
+void l1_cache_cacp::print_CACP_stats() const
+{
+  m_cacp_stats->dj_print_stats();
+}
+//***************** class cache_cacp_stats *******************/
+void cache_cacp_stats::dj_record_stats(bool critical, enum cache_request_status status, bool critical_eviction, bool zero_reuse, bool correct)
+{
+  //Record critical accesses
+  if (critical){
+    if (status == HIT){// || status == HIT_RESERVED){ // TODO: HIT_RESERVED
+      dj_total_crit_hit++;
+    }
+    dj_total_crit_access++;
+  }
+  //Record total accesses
+  if (status == HIT){
+    dj_total_hit++;
+  }
+  dj_total_access++;
+  //Record zero reuses
+  if (critical_eviction){
+    if (zero_reuse)
+      dj_zero_reuses++;
+    dj_critical_evictions++;
+  }
+  //Record CCBP accuracy
+  if (correct)
+    dj_CCBP_correct++;
+}
+void cache_cacp_stats::dj_print_stats() const
+{
+  printf("\tCritical Hit: %d, Critical Access: %d, Critical Hit Rate: %.2f%%\n", dj_total_crit_hit, dj_total_crit_access, 100.0*dj_total_crit_hit/dj_total_crit_access);
+  printf("\tTotal Hit: %d, Total Access: %d, Total Hit Rate: %.2f%%\n", dj_total_hit, dj_total_access, 100.0*dj_total_hit/dj_total_access);
+  printf("\tZero eviction: %d, Critical eviction: %d, Total zero eviction pct: %.2f%%\n", dj_zero_reuses, dj_critical_evictions, 100.0*dj_zero_reuses/dj_critical_evictions);
+  printf("\tCCBP correct: %d, Total Access: %d, CCBP accuracy: %.2f%%\n", dj_CCBP_correct, dj_total_access, 100.0*dj_CCBP_correct/dj_total_access);
+}
 //***************** class tag_array_CACP *********************/
-enum cache_request_status tag_array_CACP::probe( new_addr_type addr, unsigned &idx, bool critical, unsigned pc )  {
+enum cache_request_status tag_array_CACP::probe( new_addr_type addr, unsigned &idx, bool critical, unsigned pc, bool &critical_eviction, bool &zero_reuse, bool &correct_prediction)  {
     //assert( m_config.m_write_policy == READ_ONLY );
     unsigned signature=(addr & 255)^(pc & 255);
     //unsigned signature=last 8 bits of PC and request addrees. Needs PC address sent here.
@@ -90,14 +142,19 @@ enum cache_request_status tag_array_CACP::probe( new_addr_type addr, unsigned &i
 	}
       }
     }
+    bool crit;
     int start_way, end_way;
     if(CCBP[signature]>=2){
       start_way = 0;
-      end_way = (int)m_config.m_assoc / 2;
+      end_way = (int)m_config.m_assoc * PARTITION_PCT / 100;
+      crit = true;
+      correct_prediction = critical;
     }
     else{
-      start_way = (int)m_config.m_assoc / 2;
+      start_way = (int)m_config.m_assoc * PARTITION_PCT / 100;
       end_way = (int)m_config.m_assoc;
+      crit = false;
+      correct_prediction = !critical;
     }
     unsigned invalid_line = (unsigned)-1;
     unsigned valid_line = (unsigned)-1;
@@ -149,10 +206,14 @@ enum cache_request_status tag_array_CACP::probe( new_addr_type addr, unsigned &i
     } else if ( valid_line != (unsigned)-1) {
         idx = valid_line;
     } else abort(); // if an unreserved block exists, it is either invalid or replaceable 
-	
+    
     //call CACP eviction function in extended object.
-    if( m_lines[idx].m_status == MODIFIED )
-      cacp_eviction(idx, set_index);	 
+    if( m_lines[idx].m_status != INVALID ){
+      cacp_eviction(idx, set_index);
+      critical_eviction = crit;
+      if (critical_eviction)
+	zero_reuse = !m_lines[idx].c_reuse && !m_lines[idx].nc_reuse;
+    }
     return MISS;
 }
 void tag_array_CACP::cacp_hit(bool critical, unsigned &idx){
@@ -176,7 +237,8 @@ void tag_array_CACP::cacp_hit(bool critical, unsigned &idx){
 void tag_array_CACP::cacp_eviction(unsigned &idx, unsigned set_index){
 	cache_block_t &evicted=m_lines[idx];
 	int signature=evicted.sig;
-	if(!evicted.c_reuse && evicted.nc_reuse && set_index<=(m_config.m_nset)/2-1)
+	unsigned way = idx - set_index*m_config.m_assoc;
+	if(!evicted.c_reuse && evicted.nc_reuse && way<m_config.m_assoc*PARTITION_PCT/100)
 	{	
 		if(CCBP[signature]!=0)
 			CCBP[evicted.sig]--;

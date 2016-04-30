@@ -925,6 +925,14 @@ void gpgpu_sim::gpu_print_stat()
    core_cache_stats.print_stats(stdout, "Total_core_cache_stats_breakdown");
    shader_print_scheduler_stat( stdout, false );
 
+   //******************* TW: 04/30/16 *****************/
+   printf("\nCACP Stats\n");
+   for(unsigned i=0; i<m_config.num_cluster(); i++){
+     if (m_shader_config->dj_gpgpu_with_cacp){
+       m_cluster[i]->print_CACP_stats();
+     }
+   }
+   //**************************************************/
    m_shader_stats->print(stdout);
 
 #ifdef GPGPUSIM_POWER_MODEL
