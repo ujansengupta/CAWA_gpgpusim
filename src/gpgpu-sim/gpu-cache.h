@@ -327,6 +327,7 @@ protected:
     enum set_index_function m_set_index_function; // Hash, linear, or custom set index function
 
     friend class tag_array;
+    friend class tag_array_CACP;
     friend class baseline_cache;
     friend class read_only_cache;
     friend class tex_cache;
@@ -359,6 +360,7 @@ public:
 
     enum cache_request_status probe( new_addr_type addr, unsigned &idx ) const;
     virtual enum cache_request_status probe( new_addr_type addr, unsigned &idx, bool critical, unsigned pc, bool &critical_eviction, bool &zero_reuse, bool &correct_prediction) {assert(0); return MISS; };
+    virtual enum cache_request_status probe_normal( new_addr_type addr, unsigned &idx, bool critical, unsigned pc, bool &critical_eviction, bool &zero_reuse) {assert(0); return MISS; };
     enum cache_request_status access( new_addr_type addr, unsigned time, unsigned &idx );
     enum cache_request_status access( new_addr_type addr, unsigned time, unsigned &idx, bool &wb, cache_block_t &evicted );
 
@@ -421,8 +423,10 @@ class tag_array_CACP :public tag_array{
 			CCBP[i]=1;//Currently setting to 1. need to experiment for better values.
 	}
 	virtual enum cache_request_status probe( new_addr_type addr, unsigned &idx, bool critical, unsigned pc, bool &critical_eviction, bool &zero_reuse, bool &correct_prediction);
-	 void cacp_hit(bool critical, unsigned &idx);
-	 void cacp_eviction(unsigned &idx, unsigned set_index);
+	virtual enum cache_request_status probe_normal( new_addr_type addr, unsigned &idx, bool critical, unsigned pc, bool &critical_eviction, bool &zero_reuse);
+	 void cacp_hit(bool critical, unsigned idx);
+	 void cacp_hit_stats(bool critical, unsigned idx);
+	 void cacp_eviction(unsigned idx, unsigned set_index);
 	protected:
 	tag_array_CACP( cache_config &config, int core_id, int type_id, cache_block_t* new_lines ):tag_array( config, core_id, type_id, new_lines){
 		CCBP=new int[256]; 
@@ -1046,16 +1050,19 @@ public:
               mem_fetch_interface *memport,
               mem_fetch_allocator *mfcreator,
               enum mem_fetch_status status,
-              tag_array_CACP* new_tag_array )
+	      tag_array_CACP* new_tag_array,
+	      bool real_cacp)
     : data_cache( name,
                   config,
                   core_id,type_id,memport,mfcreator,status, new_tag_array, L1_WR_ALLOC_R, L1_WRBK_ACC )
       {
 	m_cacp_stats = new cache_cacp_stats;
+	m_real_cacp = real_cacp; 
       }
    
  private:
     cache_cacp_stats* m_cacp_stats;
+    bool m_real_cacp;
 };
 //*****David-4/24*******************************************/
 /// Models second level shared cache with global write-back

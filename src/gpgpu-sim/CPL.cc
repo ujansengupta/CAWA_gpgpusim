@@ -141,7 +141,7 @@ void shader_core_config::tw_cawa_reg_options(class OptionParser * opp)
 			 "0");
   option_parser_register(opp, "-gpgpu_oracle_counter_from_scheduler", OPT_CSTR, &tw_gpgpu_oracle_scheduler_string,
 			 "oracle counter from which previous scheduler",
-			 "gto");
+			 "lrr");
   option_parser_register(opp, "-caws_oracle_cpl_exec_cycles", OPT_BOOL, &tw_oracle_cpl_exec_cycles,
 			 "on = use execution cycles from enter to complete, off = use execution cycle distribution",
 			 "0");
@@ -159,6 +159,9 @@ void shader_core_config::tw_cawa_reg_options(class OptionParser * opp)
 			 "1");
   option_parser_register(opp, "-gpgpu_with_cacp", OPT_BOOL, &dj_gpgpu_with_cacp,
 			 "Use CACP or not (default=off)",
+			 "0");
+  option_parser_register(opp, "-gpgpu_with_cacp_stats", OPT_BOOL, &dj_gpgpu_with_cacp_stats,
+			 "Calculate CACP stats on normal cache or not (default=off)",
 			 "0");
 }
 
@@ -249,7 +252,7 @@ void shader_core_ctx::tw_calculate_cpl_accuracy() const
     unsigned start_warp_id, end_warp_id;
     tw_get_start_end_warp_id(&start_warp_id, &end_warp_id, i);
     assert(start_warp_id < m_warp.size() && end_warp_id <= m_warp.size());
-    assert(end_warp_id - start_warp_id == 8);
+    //    assert(end_warp_id - start_warp_id == 8);
     unsigned crit_warp = start_warp_id;
     for (unsigned j = start_warp_id; j < end_warp_id; j++){
       if (m_warp[j].tw_get_oracle_CPL() > m_warp[crit_warp].tw_get_oracle_CPL()){

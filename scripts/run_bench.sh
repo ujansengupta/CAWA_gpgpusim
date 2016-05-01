@@ -6,16 +6,31 @@ run_bench()
     cd $1
     if [ "$3" = "no" ]
     then
-        echo "Running $BENCH..."
+        echo "Running $1..."
         if [ "$2" = "" ]
         then
             sh README.GPGPU-Sim
         else
-	    if [ "$5" = "yes" ]
+	    if [ "$4" = "gto" ] || [ "$4" = "lrr" ]
 	    then
-		OUT=results.$4.actual.{$6$7}.txt
+		if [ "$6" = "yes" ]
+		then
+		    if [ "$9" = "yes" ]
+		    then
+			OUT=results.$4.\(cacp\).txt
+		    else
+			OUT=results.$4.cacp.txt
+		    fi
+		else
+		    OUT=results.$4.txt
+		fi
 	    else
-		OUT=results.$4.oracle.txt
+		if [ "$5" = "yes" ]
+		then
+		    OUT=results.$4.actual.{$7$8}.txt
+		else
+		    OUT=results.$4.oracle.txt
+		fi
 	    fi
             if [ -f $OUT ]
             then

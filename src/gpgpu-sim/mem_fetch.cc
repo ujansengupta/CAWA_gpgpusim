@@ -132,6 +132,3 @@ unsigned mem_fetch::get_num_flits(bool simt_to_mem){
 
 	return (sz/icnt_flit_size) + ( (sz % icnt_flit_size)? 1:0);
 }
-
-
-

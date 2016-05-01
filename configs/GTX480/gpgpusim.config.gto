@@ -48,7 +48,8 @@
 # <nsets>:<bsize>:<assoc>,<rep>:<wr>:<alloc>:<wr_alloc>:<set_index_fn>,<mshr>:<N>:<merge>,<mq>:**<fifo_entry>
 # ** Optional parameter - Required when mshr_type==Texture Fifo
 # Note: Hashing set index function (H) only applies to a set size of 32 or 64. 
--gpgpu_cache:dl1  32:128:4,L:L:m:N:H,A:32:8,8
+#-gpgpu_cache:dl1  32:128:4,L:L:m:N:H,A:32:8,8
+-gpgpu_cache:dl1 8:128:16,L:L:m:N:L,A:32:8,8
 -gpgpu_shmem_size 49152
 
 # The alternative configuration for fermi in case cudaFuncCachePreferL1 is selected
