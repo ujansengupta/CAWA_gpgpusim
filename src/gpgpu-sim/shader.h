@@ -1451,6 +1451,7 @@ struct shader_core_config : public core_config
     bool tw_gpgpu_store_oracle_counter; // on = store oracle counter
     bool tw_calculate_cpl_accuracy;  // on = calculate cpl accuracy for the actual counter
     bool dj_gpgpu_with_cacp; // on = use cacp; off = no cacp
+    bool dj_gpgpu_with_cacp_stats; // on = use cacp; off = no cacp
     //****************************************/
 
     //op collector

@@ -10,7 +10,7 @@
  ****  04/07/16                                       ****
  *********************************************************/
 #include "shader.h"
-#define CRIT_PCT 0.75
+#define CRIT_PCT 0.5
 #define PARTITION_PCT 50
 void simt_core_cluster::print_CACP_stats() const
 {
@@ -26,14 +26,18 @@ void ldst_unit::print_CACP_stats() const
 //***************** class shader_core_ctx *********************/
  void shader_core_ctx::calc_warp_criticality()
  {
-   int max=0;
+   float max=-1.0*(0xFFFFFFFF), min = 1.0*(0xFFFFFFF);
    //need to add check for first run.
-   for (long index=0; index<(long)m_warp.size(); ++index) 
+   for (long index=0; index<(long)m_warp.size(); ++index) {
      if(max<m_warp.at(index).tw_get_CPL())
        max=m_warp.at(index).tw_get_CPL();
+     if (min > m_warp.at(index).tw_get_CPL())
+       min=m_warp.at(index).tw_get_CPL();
+   }
    for (long index=0; index<(long)m_warp.size(); ++index) 
-     if(m_warp.at(index).tw_get_CPL()/max>CRIT_PCT)
+     if((m_warp.at(index).tw_get_CPL()-min)/(max-min)>CRIT_PCT){
        m_warp.at(index).criticality=true;
+     }
      else
        m_warp.at(index).criticality=false;
  }
@@ -61,8 +65,15 @@ l1_cache_cacp::access( new_addr_type addr,
   new_addr_type block_addr = m_config.block_addr(addr);
   unsigned cache_index = (unsigned)-1;
   bool zero_reuse = false, critical_eviction = false, correct_prediction = false;
-  enum cache_request_status probe_status
-    = m_tag_array->probe( block_addr, cache_index , mf->req_criticality, mf->get_pc(), critical_eviction, zero_reuse, correct_prediction);
+  enum cache_request_status probe_status;
+  if (m_real_cacp){
+    probe_status
+      = m_tag_array->probe( block_addr, cache_index , mf->req_criticality, mf->get_pc(), critical_eviction, zero_reuse, correct_prediction);
+  }
+  else{
+    probe_status
+      = m_tag_array->probe_normal( block_addr, cache_index , mf->req_criticality, mf->get_pc(), critical_eviction, zero_reuse);
+  }
   enum cache_request_status access_status
     = process_tag_probe( wr, probe_status, addr, cache_index, mf, time, events );
   m_stats.inc_stats(mf->get_access_type(),
@@ -104,9 +115,86 @@ void cache_cacp_stats::dj_print_stats() const
   printf("\tCritical Hit: %d, Critical Access: %d, Critical Hit Rate: %.2f%%\n", dj_total_crit_hit, dj_total_crit_access, 100.0*dj_total_crit_hit/dj_total_crit_access);
   printf("\tTotal Hit: %d, Total Access: %d, Total Hit Rate: %.2f%%\n", dj_total_hit, dj_total_access, 100.0*dj_total_hit/dj_total_access);
   printf("\tZero eviction: %d, Critical eviction: %d, Total zero eviction pct: %.2f%%\n", dj_zero_reuses, dj_critical_evictions, 100.0*dj_zero_reuses/dj_critical_evictions);
-  printf("\tCCBP correct: %d, Total Access: %d, CCBP accuracy: %.2f%%\n", dj_CCBP_correct, dj_total_access, 100.0*dj_CCBP_correct/dj_total_access);
+  printf("\tCCBP correct: %d, Total CCBP Access: %d, CCBP accuracy: %.2f%%\n", dj_CCBP_correct, dj_total_access, 100.0*dj_CCBP_correct/dj_total_access);
 }
 //***************** class tag_array_CACP *********************/
+enum cache_request_status tag_array_CACP::probe_normal( new_addr_type addr, unsigned &idx, bool critical, unsigned pc, bool &critical_eviction, bool &zero_reuse)
+{
+  //assert( m_config.m_write_policy == READ_ONLY );                         
+  unsigned set_index = m_config.set_index(addr);
+  new_addr_type tag = m_config.tag(addr);
+
+  unsigned invalid_line = (unsigned)-1;
+  unsigned valid_line = (unsigned)-1;
+  unsigned valid_timestamp = (unsigned)-1;
+
+  bool all_reserved = true;
+
+  // check for hit or pending hit                                           
+  for (unsigned way=0; way<m_config.m_assoc; way++) {
+    unsigned index = set_index*m_config.m_assoc+way;
+    cache_block_t *line = &m_lines[index];
+    if (line->m_tag == tag) {
+      if ( line->m_status == RESERVED ) {
+	idx = index;
+	//call CACP HIT function in extended object
+	cacp_hit_stats(critical,idx);
+	return HIT_RESERVED;
+      } else if ( line->m_status == VALID ) {
+	idx = index;
+	//call CACP HIT function in extended object
+	cacp_hit_stats(critical,idx);
+	return HIT;
+      } else if ( line->m_status == MODIFIED ) {
+	idx = index;
+	//call CACP HIT function in extended object
+	cacp_hit_stats(critical,idx);
+	return HIT;
+      } else {
+	assert( line->m_status == INVALID );
+      }
+    }
+    if (line->m_status != RESERVED) {
+      all_reserved = false;
+      if (line->m_status == INVALID) {
+	invalid_line = index;
+      } else {
+	// valid line : keep track of most appropriate replacement candidate
+	if ( m_config.m_replacement_policy == LRU ) {
+	  if ( line->m_last_access_time < valid_timestamp ) {
+	    valid_timestamp = line->m_last_access_time;
+	    valid_line = index;
+	  }
+	} else if ( m_config.m_replacement_policy == FIFO ) {
+	  if ( line->m_alloc_time < valid_timestamp ) {
+	    valid_timestamp = line->m_alloc_time;
+	    valid_line = index;
+	  }
+	}
+      }
+    }
+  }
+  if ( all_reserved ) {
+    assert( m_config.m_alloc_policy == ON_MISS );
+    return RESERVATION_FAIL; // miss and not enough space in cache to allocate on miss                                                                 
+  }
+
+  if ( invalid_line != (unsigned)-1 ) {
+    idx = invalid_line;
+  } else if ( valid_line != (unsigned)-1) {
+    idx = valid_line;
+  } else abort(); // if an unreserved block exists, it is either invalid or replaceable                                                                  
+   //      check and add this follwoing to probe. COver all
+  
+  if (m_lines[idx].m_status != INVALID) {
+    critical_eviction = critical;
+    if (critical_eviction){
+      zero_reuse = !m_lines[idx].c_reuse && !m_lines[idx].nc_reuse;
+    }
+  }
+  return MISS;
+}
+
 enum cache_request_status tag_array_CACP::probe( new_addr_type addr, unsigned &idx, bool critical, unsigned pc, bool &critical_eviction, bool &zero_reuse, bool &correct_prediction)  {
     //assert( m_config.m_write_policy == READ_ONLY );
     unsigned signature=(addr & 255)^(pc & 255);
@@ -142,18 +230,15 @@ enum cache_request_status tag_array_CACP::probe( new_addr_type addr, unsigned &i
 	}
       }
     }
-    bool crit;
     int start_way, end_way;
     if(CCBP[signature]>=2){
       start_way = 0;
       end_way = (int)m_config.m_assoc * PARTITION_PCT / 100;
-      crit = true;
       correct_prediction = critical;
     }
     else{
       start_way = (int)m_config.m_assoc * PARTITION_PCT / 100;
       end_way = (int)m_config.m_assoc;
-      crit = false;
       correct_prediction = !critical;
     }
     unsigned invalid_line = (unsigned)-1;
@@ -210,13 +295,22 @@ enum cache_request_status tag_array_CACP::probe( new_addr_type addr, unsigned &i
     //call CACP eviction function in extended object.
     if( m_lines[idx].m_status != INVALID ){
       cacp_eviction(idx, set_index);
-      critical_eviction = crit;
-      if (critical_eviction)
+      critical_eviction = critical;
+      if (critical_eviction){
 	zero_reuse = !m_lines[idx].c_reuse && !m_lines[idx].nc_reuse;
+      }
     }
     return MISS;
 }
-void tag_array_CACP::cacp_hit(bool critical, unsigned &idx){
+void tag_array_CACP::cacp_hit_stats(bool critical, unsigned idx){
+  if(critical){
+    m_lines[idx].c_reuse=1;
+  }
+  else{
+    m_lines[idx].nc_reuse=1;
+  }
+}
+void tag_array_CACP::cacp_hit(bool critical, unsigned idx){
 	int signature=m_lines[idx].sig;
 	if(critical)
 	{
@@ -234,7 +328,7 @@ void tag_array_CACP::cacp_hit(bool critical, unsigned &idx){
 	}
 	
 }
-void tag_array_CACP::cacp_eviction(unsigned &idx, unsigned set_index){
+void tag_array_CACP::cacp_eviction(unsigned idx, unsigned set_index){
 	cache_block_t &evicted=m_lines[idx];
 	int signature=evicted.sig;
 	unsigned way = idx - set_index*m_config.m_assoc;

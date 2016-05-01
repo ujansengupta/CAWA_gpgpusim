@@ -1416,7 +1416,9 @@ mem_stage_stall_type ldst_unit::process_memory_access_queue( cache_t *cache, war
 
     //const mem_access_t &access = inst.accessq_back();
     mem_fetch *mf = m_mf_allocator->alloc(inst,inst.accessq_back());
-	mf->req_criticality=m_core->get_warp_critical(mf->get_wid());
+    //************* david ******************/
+    mf->req_criticality=m_core->get_warp_critical(mf->get_wid());
+    //**************************************/
     std::list<cache_event> events;
     enum cache_request_status status = cache->access(mf->get_addr(),mf,gpu_sim_cycle+gpu_tot_sim_cycle,events);
     return process_cache_access( cache, mf->get_addr(), inst, events, mf, status );
@@ -1705,8 +1707,8 @@ ldst_unit::ldst_unit( mem_fetch_interface *icnt,
 						m_icnt,
 						m_mf_allocator,
 						IN_L1D_MISS_QUEUE,
-						new_tag_array
-						);
+						new_tag_array,
+						m_config->dj_gpgpu_with_cacp_stats);
 	}
 	else{
 	  //*****David-4/22*******************************************/

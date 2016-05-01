@@ -13,6 +13,7 @@ config()
     if [ "$3" = "no" ]
     then
 	printf "\n-gpgpu_load_oracle_counter 1" >> gpgpusim.config
+	printf "\n-gpgpu_store_oracle_counter 1" >> gpgpusim.config
     else
 	printf "\n-gpgpu_store_oracle_counter 1" >> gpgpusim.config
 	printf "\n-caws_calculate_cpl_accuracy 0" >> gpgpusim.config
@@ -42,6 +43,10 @@ config()
     if [ "$8" = "1" ]
     then
 	printf "\n-caws_oracle_cpl_exec_cycles 1" >> gpgpusim.config
+    fi
+    if [ "$9" = "1" ]
+    then
+	printf "\n-gpgpu_with_cacp_stats 1" >> gpgpusim.config
     fi
     cd ../../../
 }
