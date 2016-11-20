@@ -2,8 +2,7 @@
 
 ****************************************************
 Changes to the gpgpusim code:
-
-CPL: all the newly defined functions are in CPL.cc
+CPL:Aall the newly defined functions are in CPL.cc
      Also made changes to:
       	  abstract_hardware_model.h
 	  gpgpusim_entrypoint.cc
@@ -11,12 +10,12 @@ CPL: all the newly defined functions are in CPL.cc
 	  shader.cc
 	  gpu-sim.cc
      	 *Just search "TW:" or "tw_" in those files you can find all the changes
-gCAWS/CAWS: all the newly defined function are in CAWS.cc
+gCAWS/CAWS: All the newly defined function are in CAWS.cc
 	    Also made changes to:
 	    shader.h
             shader.cc
          *Just search "US" or "CAWS" in those files you can find all the changes
-CACP: all the newly defined function are in CACP.cc
+CACP: All the newly defined function are in CACP.cc
       Also made changes to:
       	   shader.h
            shader.cc
