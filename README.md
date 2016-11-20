@@ -29,13 +29,13 @@
 	 		*Just search "david" or "CACP" in those files you can find all the changes
 ****************************************************
 
-The CAWA paper : https://pdfs.semanticscholar.org/0ca2/b92a4f992b35683c7fffcd49b4c883772a29.pdf
+# The CAWA paper : 
+	https://pdfs.semanticscholar.org/0ca2/b92a4f992b35683c7fffcd49b4c883772a29.pdf
 
 To run with scripts: (run at one level above gpgpu-sim_distribution)
-cp -r CAWA/scripts .
-# (04/26/16) caws contains oracle_predictor and caws, should be the newest branch.
-# (04/26/16) only AES and BFS have oracle counters generated and more are coming...
-To run with my scripts:
+	cp -r CAWA/scripts.
+	
+To run with provided scripts:
   copy the whole scripts folder to ~/
   change SRC_PATH to the compiling gpgpusim folder (e.g. gpgpu-sim_distribution)
   go to your $SRC_PATH folder and do source setup_environment
