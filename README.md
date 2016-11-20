@@ -2,6 +2,7 @@
 
 ****************************************************
 Changes to the gpgpusim code:
+
 CPL: all the newly defined functions are in CPL.cc
      Also made changes to:
       	  abstract_hardware_model.h
