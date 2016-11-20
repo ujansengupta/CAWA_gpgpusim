@@ -1,4 +1,35 @@
 # gpgpusim
+
+****************************************************
+Changes to the gpgpusim code:
+CPL: all the newly defined functions are in CPL.cc
+     Also made changes to:
+      	  abstract_hardware_model.h
+	  gpgpusim_entrypoint.cc
+	  shader.h
+	  shader.cc
+	  gpu-sim.cc
+     	 *Just search "TW:" or "tw_" in those files you can find all the changes
+gCAWS/CAWS: all the newly defined function are in CAWS.cc
+	    Also made changes to:
+	    shader.h
+            shader.cc
+         *Just search "US" or "CAWS" in those files you can find all the changes
+CACP: all the newly defined function are in CACP.cc
+      Also made changes to:
+      	   shader.h
+           shader.cc
+	   gpu-cache.h
+	   gpu-cache.cc
+	   mem_fetch.h
+	   mem_fetch.cc
+	 *Just search "david" or "CACP" in those files you can find all the changes
+****************************************************
+
+The CAWA paper : https://pdfs.semanticscholar.org/0ca2/b92a4f992b35683c7fffcd49b4c883772a29.pdf
+
+To run with scripts: (run at one level above gpgpu-sim_distribution)
+cp -r CAWA/scripts .
 # (04/26/16) caws contains oracle_predictor and caws, should be the newest branch.
 # (04/26/16) only AES and BFS have oracle counters generated and more are coming...
 To run with my scripts:
