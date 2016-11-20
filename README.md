@@ -1,28 +1,31 @@
 # gpgpusim
 
 ****************************************************
-Changes to the gpgpusim code:
-	CPL : 		All the newly defined functions are in CPL.cc
-     			Also made changes to:
-      	  			abstract_hardware_model.h
-	  			gpgpusim_entrypoint.cc
-	  			shader.h
-	  			shader.cc
-	  			gpu-sim.cc
+# Changes to the gpgpusim code:
+# CPL : 		
+		All the newly defined functions are in CPL.cc
+     		Also made changes to:
+       			abstract_hardware_model.h
+  			gpgpusim_entrypoint.cc
+  			shader.h
+  			shader.cc
+  			gpu-sim.cc
      	 		*Just search "TW:" or "tw_" in those files you can find all the changes
-	gCAWS/CAWS: 	All the newly defined function are in CAWS.cc
-	    		Also made changes to:
-	    			shader.h
-            			shader.cc
-         			*Just search "US" or "CAWS" in those files you can find all the changes
-	CACP: 		All the newly defined function are in CACP.cc
-      			Also made changes to:
-      	  			 shader.h
-          			 shader.cc
-	   			gpu-cache.h
-	   			gpu-cache.cc
-	   			mem_fetch.h
-	   			mem_fetch.cc
+# gCAWS/CAWS: 	
+		All the newly defined function are in CAWS.cc
+	    	Also made changes to:
+	    		shader.h
+       			shader.cc
+       			*Just search "US" or "CAWS" in those files you can find all the changes
+# CACP: 		
+		All the newly defined function are in CACP.cc
+      		Also made changes to:
+       			 shader.h
+       			 shader.cc
+   			 gpu-cache.h
+	   	       	 gpu-cache.cc
+	   		 mem_fetch.h
+	   		 mem_fetch.cc
 	 		*Just search "david" or "CACP" in those files you can find all the changes
 ****************************************************
 
